@@ -37,4 +37,7 @@ jobs:
       - name: Check docker info
         run: docker info
       - name: run containers
-        run: docker run ${{ matrix.images }}
+        timeout-minutes: 1
+        run: |
+          docker run ${{ matrix.images }}
+          sleep 80
