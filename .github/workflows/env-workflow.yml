@@ -24,3 +24,8 @@ jobs:
     steps:
       - name: checking the workflow env
         run: echo $DOCKER_NAME
+      - name: checking steps env level
+        env:
+          DOCKER_NAME: jeszcze
+          DOCKER_PASSWORD: nie
+        run: echo ${{ env.DOCKER_NAME }} $$ echo $ {{ env.DOCKER_PASSWORD }}
