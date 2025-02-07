@@ -5,9 +5,6 @@ on: workflow_dispatch
 env:
   DOCKER_NAME: maciek
 jobs:
-  matrix:
-    images: [hello-world, alpine]
-    os: [ubuntu-latest, windows-latest]
   first_job:
     runs-on: ubuntu-latest
     env:
@@ -32,11 +29,12 @@ jobs:
         run: echo ${{ vars.DOCKER_NAME }} 
   third-job:
     runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        images: [hello-world, alpine]
+        os: [ubuntu-latest, windows-latest]
     steps:
       - name: Check docker info
         run: docker info
-  next-job:
-    runs-on: ${{ matrix.os }}
-    steps:
       - name: run containers
         run: docker run ${{ matrix.images }}
