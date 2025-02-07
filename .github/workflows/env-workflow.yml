@@ -4,20 +4,18 @@ on: push
 
 env:
   DOCKER_NAME: maciek
-  DOCKER_PASSWORD: cep
 jobs:
   first_job:
     runs-on: ubuntu-latest
     env:
       DOCKER_NAME: kacper
-      DOCKER_PASSWORD: siema
     steps:
       - name: checkout git
         uses: actions/checkout@v4
       - name: print env variables
         run: echo $DOCKER_NAME
       - name: print env, by different syntax
-        run: echo ${{ env.DOCKER_PASSWORD }}
+        run: echo ${{ secrets.DOCKER_PASSWORD }}
   second_job:
     runs-on: ubuntu-latest
     needs: first_job
@@ -28,4 +26,4 @@ jobs:
         env:
           DOCKER_NAME: jeszcze
           DOCKER_PASSWORD: nie
-        run: echo ${{ env.DOCKER_NAME }} $$ echo $ {{ env.DOCKER_PASSWORD }}
+        run: echo ${{ vars.DOCKER_NAME }} 
