@@ -1,6 +1,6 @@
 name: Workflow to check env variables
 
-on: workfow_dispatch
+on: workflow_dispatch
 #on: push
 env:
   DOCKER_NAME: maciek
