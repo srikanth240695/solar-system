@@ -11,7 +11,7 @@ jobs:
 
       - name: Welcome message
         run: | 
-        echo "Siemanko"
-        ls -al
-        cat README.md
+          echo "Siemanko"
+          ls -al
+          cat README.md
     
