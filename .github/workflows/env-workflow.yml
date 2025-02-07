@@ -1,10 +1,13 @@
 name: Workflow to check env variables
 
-on: push
-
+on: workfow_dispatch
+#on: push
 env:
   DOCKER_NAME: maciek
 jobs:
+  matrix:
+    images: [hello-world, alpine]
+    os: [ubuntu-latest, windows-latest]
   first_job:
     runs-on: ubuntu-latest
     env:
@@ -27,3 +30,13 @@ jobs:
           DOCKER_NAME: jeszcze
           DOCKER_PASSWORD: nie
         run: echo ${{ vars.DOCKER_NAME }} 
+  third-job:
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Check docker info
+        run: docker info
+  next-job:
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: run containers
+        run: docker run ${{ matrix.images }}
