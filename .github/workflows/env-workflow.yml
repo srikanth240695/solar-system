@@ -1,0 +1,18 @@
+name: Workflow to check env variables:
+
+on: push
+
+jobs:
+  first_job:
+    name: check env from job level
+    runs-on: ubuntu-latest
+    env:
+      DOCKER_NAME: kacper
+      DOCKER_PASSWORD: siema
+    steps:
+      - name: checkout git
+        uses: actions/checkout@v4
+      - name: print env variables
+        run: echo $DOCKER_NAME
+      - name: print env, by different syntax
+        run: echo ${{ env.DOCKER_PASSWORD }}
