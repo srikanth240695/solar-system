@@ -16,7 +16,7 @@ jobs:
           name: dragon-file
           path: dragon.txt
   test_job:
-    runs_on: ubuntu-latest
+    runs-on: ubuntu-latest
     needs: ascii_job
     steps:
       - name: download-artifact
