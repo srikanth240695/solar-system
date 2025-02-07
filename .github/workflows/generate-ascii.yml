@@ -5,7 +5,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
-        run: actions/checkout@v4
+        uses: actions/checkout@v4
       - name: Download dependencies
         run: apt install cowsay -y
       - name: Execute cowsay
