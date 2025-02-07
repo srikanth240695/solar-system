@@ -4,7 +4,6 @@ on: push
 
 jobs:
   first_job:
-    name: check env from job level
     runs-on: ubuntu-latest
     env:
       DOCKER_NAME: kacper
