@@ -13,6 +13,6 @@ jobs:
       - name: checkout git
         uses: actions/checkout@v4
       - name: print env variables
-        run: echo $DOCKER_NAME
+        run: echo "$DOCKER_NAME"
       - name: print env, by different syntax
-        run: echo ${{ env.DOCKER_PASSWORD }}
+        run: echo "${{ env.DOCKER_PASSWORD }}"
