@@ -7,7 +7,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
       - name: Download dependencies
-        run: apt install cowsay -y
+        run: sudo apt-get install cowsay -y
       - name: Execute cowsay
         run: cowsay -f dragon "I am a dragon 8)" > dragon.txt
       - name: Check if it exitst
