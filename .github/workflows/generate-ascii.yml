@@ -1,0 +1,38 @@
+name: Genarating ascii art
+on: push
+jobs:
+  ascii_job: 
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+      - name: Download dependencies
+        run: sudo apt-get install cowsay -y
+      - name: Execute cowsay
+        run: cowsay -f dragon "I am a dragon 8)" > dragon.txt
+      - name: upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dragon-file
+          path: dragon.txt
+  test_job:
+    runs-on: ubuntu-latest
+    needs: ascii_job
+    steps:
+      - name: download-artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dragon-file
+
+      - name: Check if it exitst
+        run: grep -i "dragon" dragon.txt
+  deploy_job:
+    runs-on: ubuntu-latest
+    needs: test_job
+    steps:
+    - name: download-artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: dragon-file
+    - name: Print an art
+      run: cat dragon.txt

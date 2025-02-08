@@ -1,0 +1,49 @@
+name: Workflow to check env variables
+
+on: workflow_dispatch
+#on: push
+env:
+  DOCKER_NAME: maciek
+jobs:
+  first_job:
+    concurrency:
+      group: my-jobs
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    env:
+      DOCKER_NAME: kacper
+    steps:
+      - name: checkout git
+        uses: actions/checkout@v4
+      - name: print env variables
+        run: echo $DOCKER_NAME
+      - name: print env, by different syntax
+        run: echo ${{ secrets.DOCKER_PASSWORD }}
+  second_job:
+    runs-on: ubuntu-latest
+    needs: first_job
+    steps:
+      - name: checking the workflow env
+        run: echo $DOCKER_NAME
+      - name: checking steps env level
+        env:
+          DOCKER_NAME: jeszcze
+          DOCKER_PASSWORD: nie
+        run: echo ${{ vars.DOCKER_NAME }} 
+  third-job:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        images: [hello-world, alpine]
+        os: [ubuntu-latest, windows-latest]
+        exclude:
+          - images: alpine
+            os: windows-latest
+    steps:
+      - name: Check docker info
+        run: docker info
+      - name: run containers
+        timeout-minutes: 1
+        run: |
+          docker run ${{ matrix.images }}
+          sleep 80
