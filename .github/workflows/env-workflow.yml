@@ -6,6 +6,9 @@ env:
   DOCKER_NAME: maciek
 jobs:
   first_job:
+    concurrency:
+      group: my-jobs
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     env:
       DOCKER_NAME: kacper
@@ -33,6 +36,9 @@ jobs:
       matrix:
         images: [hello-world, alpine]
         os: [ubuntu-latest, windows-latest]
+        exclude:
+          - images: alpine
+            os: windows-latest
     steps:
       - name: Check docker info
         run: docker info
