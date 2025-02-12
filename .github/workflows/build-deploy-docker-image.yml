@@ -1,0 +1,25 @@
+name: Build and Run Docker Container
+
+on:
+  workflow_dispatch: 
+
+jobs:
+  build-and-run:
+    name: Build and Run Docker Container
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    - name: Build Docker Image
+      run: |
+        docker build -t solar-system:latest .
+
+    - name: Run Docker Container
+      run: |
+        docker run -d --name solar-system-container -p 80:80 solar-system:latest
+        sleep 60
