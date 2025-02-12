@@ -35,9 +35,12 @@ jobs:
 
     - name: Start ngrok
       run: |
-        ngrok http 80 --log=stdout > ngrok.log &
-    
+        nohup ngrok http 80 --log=stdout > ngrok.log &
+
+    - name: Wait for ngrok to Start
+      run: |
+        sleep 10
+
     - name: Display ngrok URL
       run: |
-        sleep 5
         cat ngrok.log | grep -o "https://[0-9a-z]*\.ngrok.io"
