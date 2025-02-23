@@ -9,7 +9,7 @@ spec:
   ports:
   - port: 3000
     protocol: TCP
-    targetPort: 3000
+    targetPort: 8880
   selector:
     app: solar-system 
   type: NodePort
