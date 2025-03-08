@@ -4,7 +4,7 @@ pipeline {
     nodejs 'nodejs-22-6-0'
   } 
   stages {
-    stagee("VM Node Version"){
+    stage("Dependencies installation"){
       steps {
         sh 'npm install --no-default'
       }
