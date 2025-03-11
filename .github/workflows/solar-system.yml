@@ -170,4 +170,32 @@ jobs:
           REPLICAS: ${{ vars.REPLICAS}}
           IMAGE: ${{ vars.DOCKERHUB_USERNAME}}/solar-system:${{ github.sha }}
           INGRESS_IP: ${{ env.INGRESS_IP}}
-
+      - name: Check files
+        run: |
+          cat kubernetes/development/*.yaml
+      - name: Create MongoDB Secret
+        run: |
+          kubectl -n ${{ vars.NAMESPACE}} create secret generic mongo-db-creds \
+          --from-literal=MONGO_URI=${{ env.MONGO_URI}}
+          --from-literal=MONGO_USERNAME=${{ env.MONGO_USERNAME}}
+          --from-literal=MONGO_PASSWORD=${{ env.MONGO_PASSWORD}}
+          --save-config \
+          --dry-run=client \
+          -o yaml | kubectl apply -f -
+      - name: Deploy to Dev Env
+        run: |
+          kubectl apply -f kubernetes/development
+      - name: Set App Ingress Host URL
+        run: |
+            echo "APP_INGRESS_HOST=$(kubectl -n ${{ vars.NAMESPACE}} get ingress -o jsonpath="{.items[0].spec.tls[0].hosts[0]}")" >> $GITHUB_ENV
+  integration-testing:
+    name: Dev Integration Testing
+    needs: dev-deploy
+    runs-on: ubuntu-latest
+    steps:
+    - name: Test URL Output using CURL and JQ
+      run: |
+        echo $URL
+        echo "---------------------------"
+        curl https://$URL/live -s -k | jq -r .status | grep -i live
+        
