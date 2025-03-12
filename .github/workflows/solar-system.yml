@@ -138,6 +138,9 @@ jobs:
           ghcr.io/${{ github.repository_owner}}/solar-system:${{ github.sha }}
   dev-deploy:
     needs: docker
+    environment:
+      name: development
+      url: https://${{ steps.set-ingress-host-address.outputs.APP_INGRESS_HOST}}
     outputs:
       APP_INGRESS_URL: ${{ steps.set-ingress-host-address.outputs.APP_INGRESS_HOST}}
     runs-on: ubuntu-latest
