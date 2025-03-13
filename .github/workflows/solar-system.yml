@@ -143,6 +143,9 @@ jobs:
     secrets:
       k8s-kubeconfig: ${{ secrets.KUBECONFIG }}
       mongodb-password: ${{ secrets.MONGO_PASSWORD }}
+    with:
+      mongodb-uri: ${{ vars.MONGO_URI}}
+      environment: development
 
   dev-integration-testing:
     if: contains(github.ref, 'feature/')
@@ -234,6 +237,9 @@ jobs:
     secrets:
       k8s-kubeconfig: ${{ secrets.KUBECONFIG }}
       mongodb-password: ${{ secrets.MONGO_PASSWORD }}
+    with:
+      mongodb-uri: ${{ vars.MONGO_URI}}
+      environment: production
 
   prod-integration-testing:
     if: github.ref == 'refs/heads/main'
