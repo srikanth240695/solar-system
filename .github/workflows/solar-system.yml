@@ -140,6 +140,9 @@ jobs:
     if: contains(github.ref, 'feature/')
     needs: docker
     uses: ./.github/workflows/resuse-deployment.yml
+    secrets:
+      k8s-kubeconfig: ${{ secrets.KUBECONFIG }}
+      mongodb-password: ${{ secrets.MONGO_PASSWORD }}
 
   dev-integration-testing:
     if: contains(github.ref, 'feature/')
@@ -228,6 +231,10 @@ jobs:
     if: github.ref == 'refs/heads/main'
     needs: docker
     uses: ./.github/workflows/resuse-deployment.yml
+    secrets:
+      k8s-kubeconfig: ${{ secrets.KUBECONFIG }}
+      mongodb-password: ${{ secrets.MONGO_PASSWORD }}
+
   prod-integration-testing:
     if: github.ref == 'refs/heads/main'
     name: Dev Integration Testing
