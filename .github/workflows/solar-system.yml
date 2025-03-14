@@ -66,15 +66,27 @@ jobs:
     
     code-coverage:
         name: code-coverage
+        container: 
+          image: node:18
+        services:
+          mongo-db:
+            image: siddharth67/mongo-db:non-prod
+            options:
+              -- name mongo
+        env:
+            MONGO_URI: 'mongodb://mongo:27017/superData'
+            MONGO_USERNAME: non-prod-user
+            MONGO_PASSWORD: non-prod-password
+
         runs-on: ubuntu-latest
         steps:
         - name: checkout repository 
           uses: actions/checkout@v4
         
-        - name: setup NodeJs Version - 18
-          uses: actions/setup-node@v3
-          with:
-            node-version: 18
+        # - name: setup NodeJs Version - 18
+        #   uses: actions/setup-node@v3
+        #   with:
+        #     node-version: 18
 
         - name: cache NPM dependencies
           uses: actions/cache@v4
