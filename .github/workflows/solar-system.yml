@@ -149,4 +149,4 @@ jobs:
         
         - name: Test image url using wget
           run: |
-            wget -q -O - $IP:3000/live | grep live || echo "service not responding"
+            wget -q -O - $IP:3000/live | grep live 
