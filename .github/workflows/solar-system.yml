@@ -207,7 +207,7 @@ jobs:
         - name: Install kubectl CLI
           uses: azure/setup-kubectl@v4
           with:
-            version: 'v1.28.0'
+            version: 'latest'
 
         - name: Decode and Set kubeconfig
           run: |
@@ -220,8 +220,8 @@ jobs:
             # Decode kubeconfig and fix paths
             echo "${{ secrets.KUBECONFIG }}" | base64 --decode > $HOME/.kube/config
             # Replace Windows paths with Unix paths
-            sed -i 's|C:\\Users\\6113534\\|$HOME/|g' $HOME/.kube/config
-            sed -i 's|\\|\/|g' $HOME/.kube/config
+            sed -i "s|C:\\\\Users\\\\6113534\\\\|$HOME/|g" $HOME/.kube/config
+            sed -i 's|\\\\|/|g' $HOME/.kube/config
             export KUBECONFIG=$HOME/.kube/config
             chmod 600 $HOME/.kube/config
     
