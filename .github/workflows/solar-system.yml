@@ -101,7 +101,7 @@ jobs:
           run: pwd
         
         - name: Debug - List Files
-          run: ls -l 
+          run: ls -l /home/runner/work/solar-system/solar-system
 
         
         
