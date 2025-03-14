@@ -209,14 +209,14 @@ jobs:
           with:
             version: 'v1.28.0'
 
-        - name: set kubeconfig file
-          uses: azure/k8s-set-context@v4
-          with:
-            method: kubeconfig
-            kubeconfig: ${{secrets.KUBECONFIG}}
-
-        - name: Fetch kubernetes cluster details
+        - name: Decode and Set kubeconfig
           run: |
+            echo "${{ secrets.KUBECONFIG }}" | base64 --decode > $HOME/.kube/config
+            export KUBECONFIG=$HOME/.kube/config
+
+        - name: Fetch Kubernetes Cluster Details
+          run: |
+            export KUBECONFIG=$HOME/.kube/config
             kubectl version --client
             echo -----------------------
             kubectl get nodes
