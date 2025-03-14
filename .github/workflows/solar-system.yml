@@ -96,9 +96,14 @@ jobs:
           with:
             username: ${{ vars.DOCKERHUB_USERNAME }}
             password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+        - name: print working directory 
+          run: pwd
         
         - name: Debug - List Files
-          run: ls -l solar-system
+          run: ls -l 
+
+        
         
         # - name: Docker build for Testing
         #   uses: docker/build-push-action@v4
