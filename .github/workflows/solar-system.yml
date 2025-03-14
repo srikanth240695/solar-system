@@ -211,15 +211,45 @@ jobs:
 
         - name: Decode and Set kubeconfig
           run: |
-            mkdir -p $HOME/.kube  # Ensure the directory exists
+            mkdir -p $HOME/.kube
+            mkdir -p $HOME/.minikube/profiles/minikube
+            # Decode and save the certificate files
+            echo "${{ secrets.MINIKUBE_CA_CRT }}" | base64 --decode > $HOME/.minikube/ca.crt
+            echo "${{ secrets.MINIKUBE_CLIENT_CRT }}" | base64 --decode > $HOME/.minikube/profiles/minikube/client.crt
+            echo "${{ secrets.MINIKUBE_CLIENT_KEY }}" | base64 --decode > $HOME/.minikube/profiles/minikube/client.key
+            # Decode kubeconfig and fix paths
             echo "${{ secrets.KUBECONFIG }}" | base64 --decode > $HOME/.kube/config
+            # Replace Windows paths with Unix paths
+            sed -i 's|C:\\Users\\6113534\\|$HOME/|g' $HOME/.kube/config
+            sed -i 's|\\|\/|g' $HOME/.kube/config
             export KUBECONFIG=$HOME/.kube/config
-            chmod 600 $HOME/.kube/config  # Secure the kubeconfig file
-
+            chmod 600 $HOME/.kube/config
+    
+        - name: Debug Kubernetes Setup
+          run: |
+            ls -la $HOME/.kube/
+            ls -la $HOME/.minikube/profiles/minikube/
+            cat $HOME/.kube/config
+            kubectl version --client
+            kubectl cluster-info --request-timeout=30s
+    
         - name: Fetch Kubernetes Cluster Details
           run: |
             export KUBECONFIG=$HOME/.kube/config
             kubectl version --client
-            echo -----------------------
             kubectl get nodes
+
+        # - name: Decode and Set kubeconfig
+        #   run: |
+        #     mkdir -p $HOME/.kube  # Ensure the directory exists
+        #     echo "${{ secrets.KUBECONFIG }}" | base64 --decode > $HOME/.kube/config
+        #     export KUBECONFIG=$HOME/.kube/config
+        #     chmod 600 $HOME/.kube/config  # Secure the kubeconfig file
+
+        # - name: Fetch Kubernetes Cluster Details
+        #   run: |
+        #     export KUBECONFIG=$HOME/.kube/config
+        #     kubectl version --client
+        #     echo -----------------------
+        #     kubectl get nodes
           
