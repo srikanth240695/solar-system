@@ -100,20 +100,14 @@ jobs:
         - name: checkout Repo
           uses: actions/checkout@v4
         
-        # - name: print working directory 
-        #   run: pwd
-        
         - name: Debug - List Files
           run: ls -l 
-
-        
         
         - name: Docker build for Testing
           uses: docker/build-push-action@v4
           with: 
             context: .
-            # file: ./solar-system/Dockerfile
-            push: false
+            load: false
             tags: ${{ vars.DOCKERHUB_USERNAME}}/solar-system:${{ github.sha}}
 
         - name: Docker Image Testing
@@ -125,6 +119,7 @@ jobs:
                 -e MONGO_USERNAME=$MONGO_USERNAME \
                 -e MONGO_PASSWORD=$MONGO_PASSWORD \
                 ${{ vars.DOCKERHUB_USERNAME}}/solar-system:${{ github.sha}}
+
         - name: List docker images 
           run: docker images
         
@@ -139,22 +134,23 @@ jobs:
 
         - name: Check open ports in container
           run: docker exec solar-system-app netstat -tulnp
-        
-        - name: Test API Inside the container
-          run: docker exec solar-system-app curl -v http://localhost:3000/live || echo "API test failed inside the conatiner"
 
-        # - name: Wait for services to be Ready
-        #   run: |
-        #     for i in {1..30}; do
-        #       wget -q -O - $IP:3000/live | grep live && break
-        #       echo "Waiting for service"
-        #       sleep 2
-        #     done
+        - name: Wait for API to be Ready
+          run: |
+            for i in {1..10}; do
+              curl -s httP://localhost:3000/live | grep live && break
+              echo "Waiting for service"
+              sleep 5
+            done
+
+        - name: Test API From Host
+          run: curl -v http://localhost:3000/live || echo "API test failed inside the conatiner"
+
         - name: Test API from Host Using Localhost
-          run: curl -v http://localhost:3000/live || echo "API test failed from host"
+          run: curl -v http://$IP:3000/live || echo "API test failed from host"
           
-        - name: Test API from Host Using Container IP
-          run: curl -v http://$IP:3000/live || echo "API test failed using container IP"
+        # - name: Test API from Host Using Container IP
+        #   run: curl -v http://$IP:3000/live || echo "API test failed using container IP"
 
         # - name: Test image url using wget
         #   run: |
