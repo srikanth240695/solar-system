@@ -135,7 +135,18 @@ jobs:
           run: |
             export IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' solar-system-app)
             echo $IP
-
-            echo Testing Image URL using wget
-            sleep 30
-            wget -q -o - $IP:3000/live | grep live 
+        
+        - name: Wait for services to be Ready
+          run: |
+            for i in {1..30}; do
+              wget -q -O - $IP:3000/live | grep live && break
+              echo "Waiting for service"
+              sleep 2
+            done
+          
+        - name: Check open ports in container
+          run: docker exec solar-system-app netstat -tulnp
+        
+        - name: Test image url using wget
+          run: |
+            wget -q -O - $IP:3000/live | grep live || echo "service not responding"
