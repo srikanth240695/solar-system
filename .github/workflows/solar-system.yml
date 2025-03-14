@@ -196,3 +196,22 @@ jobs:
         # - name: Test image url using wget
         #   run: |
         #     wget -q -O - $IP:3000/live | grep live 
+    
+    dev-deploy:
+      needs: docker
+      runs-on: ubuntu-latest
+      steps:
+        - name: checkout Repo
+          uses: actions/checkout@v4
+
+        - name: Install kubectl CLI
+          uses: azure/setup-kubectl@v4
+          with:
+            version: 'v1.26.0'
+
+        - name: Fetch kubernetes cluster details
+          run: |
+            kubectl version --short
+            echo -----------------------
+            kubectl get
+          
