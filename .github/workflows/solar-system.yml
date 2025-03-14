@@ -98,7 +98,7 @@ jobs:
             password: ${{ secrets.DOCKERHUB_PASSWORD }}
         
         - name: Debug - List Files
-          run: ls -l 
+          run: ls -l solar-system
         
         # - name: Docker build for Testing
         #   uses: docker/build-push-action@v4
