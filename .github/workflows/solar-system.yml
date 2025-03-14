@@ -240,7 +240,7 @@ jobs:
             kubectl version --client
             kubectl get nodes --request-timeout=60s
 
-        # - name: Decode and Set kubeconfig
+        # - name: Decode and Set kubeconfig dd
         #   run: |
         #     mkdir -p $HOME/.kube  # Ensure the directory exists
         #     echo "${{ secrets.KUBECONFIG }}" | base64 --decode > $HOME/.kube/config
