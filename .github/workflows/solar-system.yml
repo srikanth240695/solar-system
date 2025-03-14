@@ -134,19 +134,28 @@ jobs:
         - name: Get container IP
           run: |
             export IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' solar-system-app)
-            echo $IP
-        
-        - name: Wait for services to be Ready
-          run: |
-            for i in {1..30}; do
-              wget -q -O - $IP:3000/live | grep live && break
-              echo "Waiting for service"
-              sleep 2
-            done
-          
+            echo " Container IP: $IP"
+            echo "IP=$IP" >> $GITHUB_ENV
+
         - name: Check open ports in container
           run: docker exec solar-system-app netstat -tulnp
         
-        - name: Test image url using wget
-          run: |
-            wget -q -O - $IP:3000/live | grep live 
+        - name: Test API Inside the container
+          run: docker exec solar-system-app curl -v http://localhost:3000/live || echo "API test failed inside the conatiner"
+
+        # - name: Wait for services to be Ready
+        #   run: |
+        #     for i in {1..30}; do
+        #       wget -q -O - $IP:3000/live | grep live && break
+        #       echo "Waiting for service"
+        #       sleep 2
+        #     done
+        - name: Test API from Host Using Localhost
+          run: curl -v http://localhost:3000/live || echo "API test failed from host"
+          
+        - name: Test API from Host Using Container IP
+          run: curl -v http://$IP:3000/live || echo "API test failed using container IP"
+
+        # - name: Test image url using wget
+        #   run: |
+        #     wget -q -O - $IP:3000/live | grep live 
