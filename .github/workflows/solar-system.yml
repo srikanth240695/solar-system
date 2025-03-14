@@ -130,5 +130,5 @@ jobs:
             echo $IP
 
             echo Testing Image URL using wget
-            sleep 5
+            sleep 30
             wget -q -o - $IP:3000/live | grep live 
