@@ -225,19 +225,20 @@ jobs:
             export KUBECONFIG=$HOME/.kube/config
             chmod 600 $HOME/.kube/config
     
-        # - name: Debug Kubernetes Setup
-        #   run: |
-        #     ls -la $HOME/.kube/
-        #     ls -la $HOME/.minikube/profiles/minikube/
-        #     cat $HOME/.kube/config
-        #     kubectl version --client
-        #     kubectl cluster-info --request-timeout=30s
+        - name: Debug Kubernetes Setup
+          run: |
+            ls -la $HOME/.kube/
+            ls -la $HOME/.minikube/profiles/minikube/
+            cat $HOME/.kube/config
+            # curl -k -v https://136.226.243.102:8443/api
+            kubectl version --client
+            kubectl cluster-info --request-timeout=60s
     
         - name: Fetch Kubernetes Cluster Details
           run: |
             export KUBECONFIG=$HOME/.kube/config
             kubectl version --client
-            kubectl get nodes
+            kubectl get nodes --request-timeout=60s
 
         # - name: Decode and Set kubeconfig
         #   run: |
