@@ -97,11 +97,14 @@ jobs:
             username: ${{ vars.DOCKERHUB_USERNAME }}
             password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
+        - name: checkout Repo
+          uses: actions/checkout@v4
+        
         - name: print working directory 
           run: pwd
         
         - name: Debug - List Files
-          run: ls -l /home/runner
+          run: ls -l 
 
         
         
