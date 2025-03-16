@@ -218,12 +218,37 @@ jobs:
             sudo chmod +x /usr/local/bin/crictl
             # Verify installation
             crictl --version
+            - name: Install cri-dockerd
+            run: |
+              # Install Go (required to build cri-dockerd)
+              sudo apt-get install -y golang-go
+              go version
+              # Clone the cri-dockerd repository
+              git clone https://github.com/Mirantis/cri-dockerd.git
+              cd cri-dockerd
+              # Build cri-dockerd (use a specific commit for stability)
+              git checkout v0.3.15
+              make cri-dockerd
+              sudo mv cri-dockerd /usr/local/bin/
+              # Start cri-dockerd as a background service
+              sudo cri-dockerd --network-plugin=cni --pod-infra-container-image=registry.k8s.io/pause:3.9 &
+              # Wait for cri-dockerd to start
+              sleep 5
+              # Verify cri-dockerd is running
+              ps aux | grep cri-dockerd
 
         - name: Ensure Docker is running
           run: |
             sudo systemctl start docker
             sudo usermod -aG docker $USER
             newgrp docker
+        
+        - name: Configure crictl to use cri-dockerd
+          run: |
+            sudo mkdir -p /etc/crictl
+            echo 'runtime-endpoint: unix:///var/run/cri-dockerd.sock' | sudo tee /etc/crictl/crictl.yaml
+            # Verify crictl can connect to cri-dockerd
+            crictl ps || echo "crictl ps failed, continuing anyway"
 
         - name: Install kubectl
           run: |
