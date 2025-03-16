@@ -339,6 +339,11 @@ jobs:
         - name: Deploy to Dev env
           run: |
             kubectl apply -f kubernetes/development
+
+        - name: Verify Deployment
+          run: |
+            kubectl -n ${{ vars.NAMESPACE }} wait --for=condition=ready pod -l app=solar-system --timeout=300s
+            kubectl -n ${{ vars.NAMESPACE }} get pods
         
         - name: Set App Ingress Host URL
           id: set-ingress-host-address
@@ -400,11 +405,27 @@ jobs:
         needs: dev-deploy
         runs-on: ubuntu-latest
         steps:
-          - name: Test URL Output using CURL and JQ
-            env: 
-              URL: ${{ needs.dev-deploy.outputs.APP_INGRESS_URL }}
-            run: |
-              echo $URL
-              echo "-----------------------"
-              curl https://$URL/live -s -k | jq -r .status | grep -i live
+        - uses: actions/checkout@v4
+        - run: |
+            curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+            chmod +x kubectl
+            sudo mv kubectl /usr/local/bin/
+            kubectl version --client
+        - name: Test Application with Port Forwarding
+          env:
+            URL: ${{ needs.dev-deploy.outputs.APP_INGRESS_URL }}
+          run: |
+            echo "Ingress URL (for reference): https://$URL/live"
+            echo "Setting up port-forward..."
+            kubectl -n ${{ vars.NAMESPACE }} port-forward service/solar-system-service 3000:3000 &
+            sleep 10
+            echo "Testing: http://localhost:3000/live"
+            echo "-----------------------"
+            RESPONSE=$(curl -s "http://localhost:3000/live")
+            echo "Raw response: $RESPONSE"
+            echo "$RESPONSE" | jq -r .status | grep -i live || {
+              echo "API test failed"
+              echo "Curl exit code: $?"
+              exit 1
+            }
           
