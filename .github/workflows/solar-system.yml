@@ -243,6 +243,13 @@ jobs:
             sudo systemctl start docker
             sudo usermod -aG docker $USER
             newgrp docker
+            docker info
+        
+        - name: Verify user context
+          run: |
+            whoami
+            groups
+            docker info --format '{{.ClientInfo}}'
 
         # - name: Configure crictl to use cri-dockerd
         #   run: |
@@ -255,6 +262,7 @@ jobs:
             curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
             chmod +x kubectl
             sudo mv kubectl /usr/local/bin/
+            kubectl version --client
         
         - name: Install minikube
           run: |
@@ -265,7 +273,7 @@ jobs:
 
         - name: Start minikube with docker driver
           run: |
-            sudo -E minikube start --driver=docker --kubernetes-version=v1.32.0 --memory 4096 --cpus 2
+            minikube start --driver=docker --kubernetes-version=v1.32.0 --memory 4096 --cpus 2
 
         - name: Verify minikube cluster
           run: |
