@@ -238,6 +238,16 @@ jobs:
             # Verify cri-dockerd is running
             ps aux | grep cri-dockerd
 
+        - name: Install containernetworking-plugins
+          run: |
+            # Download and install containernetworking-plugins
+            CNI_PLUGIN_VERSION="v1.5.1"
+            echo "Installing containernetworking-plugins version $CNI_PLUGIN_VERSION"
+            sudo mkdir -p /opt/cni/bin
+            curl -L "https://github.com/containernetworking/plugins/releases/download/$CNI_PLUGIN_VERSION/cni-plugins-linux-amd64-$CNI_PLUGIN_VERSION.tgz" | sudo tar -xz -C /opt/cni/bin
+            # Verify installation
+            ls -la /opt/cni/bin
+
         - name: Ensure Docker is running
           run: |
             sudo systemctl start docker
