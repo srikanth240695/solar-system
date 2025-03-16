@@ -463,14 +463,18 @@ jobs:
         - run: |
             kubectl apply -f kubernetes/development/deployment.yaml
             kubectl apply -f kubernetes/development/service.yaml
+            echo "Checking deployment status..."
+            kubectl -n ${{ vars.NAMESPACE }} get deployment -o wide
+            kubectl -n ${{ vars.NAMESPACE }} get pods -o wide
             echo "Waiting for pods to be ready..."
             kubectl -n ${{ vars.NAMESPACE }} wait --for=condition=ready pod -l app=solar-system --timeout=300s || {
               echo "Error: Pods not ready after 300s"
-              kubectl -n ${{ vars.NAMESPACE }} describe pod -l app=solar-system
-              kubectl -n ${{ vars.NAMESPACE }} logs -l app=solar-system --all-containers=true
+              kubectl -n ${{ vars.NAMESPACE }} get all
+              kubectl -n ${{ vars.NAMESPACE }} describe deployment
+              kubectl -n ${{ vars.NAMESPACE }} describe pod
+              kubectl -n ${{ vars.NAMESPACE }} logs --all-containers=true --prefix -l app=solar-system || echo "No logs available"
               exit 1
             }
-            kubectl -n ${{ vars.NAMESPACE }} get pods
 
         - name: Test Application with Port Forwarding
           env:
