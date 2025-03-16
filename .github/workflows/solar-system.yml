@@ -204,41 +204,84 @@ jobs:
         - name: checkout Repo
           uses: actions/checkout@v4
 
-        - name: Install kubectl CLI
-          uses: azure/setup-kubectl@v4
-          with:
-            version: 'latest'
-
-        - name: Decode and Set kubeconfig
+        - name: Set up environment
           run: |
-            mkdir -p $HOME/.kube
-            mkdir -p $HOME/.minikube/profiles/minikube
-            # Decode and save the certificate files
-            echo "${{ secrets.MINIKUBE_CA_CRT }}" | base64 --decode > $HOME/.minikube/ca.crt
-            echo "${{ secrets.MINIKUBE_CLIENT_CRT }}" | base64 --decode > $HOME/.minikube/profiles/minikube/client.crt
-            echo "${{ secrets.MINIKUBE_CLIENT_KEY }}" | base64 --decode > $HOME/.minikube/profiles/minikube/client.key
-            # Decode kubeconfig and fix paths
-            echo "${{ secrets.KUBECONFIG }}" | base64 --decode > $HOME/.kube/config
-            # Replace Windows paths with Unix paths
-            sed -i "s|C:\\\\Users\\\\6113534\\\\|$HOME/|g" $HOME/.kube/config
-            sed -i "s|\\\\|/|g" $HOME/.kube/config
-            export KUBECONFIG=$HOME/.kube/config
-            chmod 600 $HOME/.kube/config
-    
+            sudo apt-get update
+            sudo apt-get install -y conntrack
+
+        - name: Ensure Docker is running
+          run: |
+            sudo systemctl start docker
+            sudo usermod -aG docker $USER
+            newgrp docker
+
+        - name: Install kubectl
+          run: |
+            curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+            chmod +x kubectl
+            sudo mv kubectl /usr/local/bin/
+        
+        - name: Install minikube
+          run: |
+            curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+            sudo install minikube-linux-amd64 /usr/local/bin/minikube
+            rm minikube-linux-amd64
+
+        - name: Start minikube
+          run: |
+            sudo -E minikube start --driver=none --force-systemd
+
+        - name: Verify minikube cluster
+          run: |
+            minikube status
+            kubectl get nodes
+            kubectl get pods -A
+
         - name: Debug Kubernetes Setup
           run: |
-            ls -la $HOME/.kube/
-            ls -la $HOME/.minikube/profiles/minikube/
-            cat $HOME/.kube/config
-            # curl -k -v https://136.226.243.102:8443/api
+            cat ~/.kube/config
             kubectl version --client
             kubectl cluster-info --request-timeout=60s
-    
+
         - name: Fetch Kubernetes Cluster Details
           run: |
-            export KUBECONFIG=$HOME/.kube/config
-            kubectl version --client
             kubectl get nodes --request-timeout=60s
+
+        # - name: Install kubectl CLI
+        #   uses: azure/setup-kubectl@v4
+        #   with:
+        #     version: 'latest'
+
+        # - name: Decode and Set kubeconfig
+        #   run: |
+        #     mkdir -p $HOME/.kube
+        #     mkdir -p $HOME/.minikube/profiles/minikube
+        #     # Decode and save the certificate files
+        #     echo "${{ secrets.MINIKUBE_CA_CRT }}" | base64 --decode > $HOME/.minikube/ca.crt
+        #     echo "${{ secrets.MINIKUBE_CLIENT_CRT }}" | base64 --decode > $HOME/.minikube/profiles/minikube/client.crt
+        #     echo "${{ secrets.MINIKUBE_CLIENT_KEY }}" | base64 --decode > $HOME/.minikube/profiles/minikube/client.key
+        #     # Decode kubeconfig and fix paths
+        #     echo "${{ secrets.KUBECONFIG }}" | base64 --decode > $HOME/.kube/config
+        #     # Replace Windows paths with Unix paths
+        #     sed -i "s|C:\\\\Users\\\\6113534\\\\|$HOME/|g" $HOME/.kube/config
+        #     sed -i "s|\\\\|/|g" $HOME/.kube/config
+        #     export KUBECONFIG=$HOME/.kube/config
+        #     chmod 600 $HOME/.kube/config
+    
+        # - name: Debug Kubernetes Setup
+        #   run: |
+        #     ls -la $HOME/.kube/
+        #     ls -la $HOME/.minikube/profiles/minikube/
+        #     cat $HOME/.kube/config
+        #     # curl -k -v https://136.226.243.102:8443/api
+        #     kubectl version --client
+        #     kubectl cluster-info --request-timeout=60s
+    
+        # - name: Fetch Kubernetes Cluster Details
+        #   run: |
+        #     export KUBECONFIG=$HOME/.kube/config
+        #     kubectl version --client
+        #     kubectl get nodes --request-timeout=60s
 
         # - name: Decode and Set kubeconfig ff
         #   run: |
