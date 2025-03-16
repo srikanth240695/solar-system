@@ -211,41 +211,34 @@ jobs:
         
         - name: Install crictl
           run: |
-            # Download and install crictl
-            CRICTL_VERSION="v1.29.0"  # Use a version compatible with Kubernetes 1.32.0
+            CRICTL_VERSION="v1.29.0"
             echo "Installing crictl version $CRICTL_VERSION"
             curl -L https://github.com/kubernetes-sigs/cri-tools/releases/download/$CRICTL_VERSION/crictl-$CRICTL_VERSION-linux-amd64.tar.gz | sudo tar -xz -C /usr/local/bin
             sudo chmod +x /usr/local/bin/crictl
-            # Verify installation
             crictl --version
-        
+
         - name: Install cri-dockerd
           run: |
-            # Install Go (required to build cri-dockerd)
-            sudo apt-get install -y golang-go
-            go version
-            # Clone the cri-dockerd repository
-            git clone https://github.com/Mirantis/cri-dockerd.git
-            cd cri-dockerd
-            # Build cri-dockerd (use a specific commit for stability)
-            git checkout v0.3.15
-            make cri-dockerd
-            sudo mv cri-dockerd /usr/local/bin/
-            # Start cri-dockerd as a background service
-            sudo cri-dockerd --network-plugin=cni --pod-infra-container-image=registry.k8s.io/pause:3.9 &
-            # Wait for cri-dockerd to start
-            sleep 5
+            CRI_DOCKERD_VERSION="v0.3.15"
+            curl -L https://github.com/Mirantis/cri-dockerd/releases/download/$CRI_DOCKERD_VERSION/cri-dockerd-$CRI_DOCKERD_VERSION.amd64.tgz | sudo tar -xz -C /usr/local/bin
+            sudo mv /usr/local/bin/cri-dockerd-$CRI_DOCKERD_VERSION.amd64 /usr/local/bin/cri-dockerd
+            sudo chmod +x /usr/local/bin/cri-dockerd
+            # Install systemd service for cri-dockerd
+            curl -L https://raw.githubusercontent.com/Mirantis/cri-dockerd/v0.3.15/cri-dockerd.service | sudo tee /etc/systemd/system/cri-dockerd.service
+            curl -L https://raw.githubusercontent.com/Mirantis/cri-dockerd/v0.3.15/cri-dockerd.socket | sudo tee /etc/systemd/system/cri-dockerd.socket
+            sudo systemctl daemon-reload
+            sudo systemctl enable cri-dockerd.socket
+            sudo systemctl start cri-dockerd.socket
+            sudo systemctl start cri-dockerd
             # Verify cri-dockerd is running
-            ps aux | grep cri-dockerd
+            sudo systemctl status cri-dockerd --no-pager
 
         - name: Install containernetworking-plugins
           run: |
-            # Download and install containernetworking-plugins
             CNI_PLUGIN_VERSION="v1.5.1"
             echo "Installing containernetworking-plugins version $CNI_PLUGIN_VERSION"
             sudo mkdir -p /opt/cni/bin
             curl -L "https://github.com/containernetworking/plugins/releases/download/$CNI_PLUGIN_VERSION/cni-plugins-linux-amd64-$CNI_PLUGIN_VERSION.tgz" | sudo tar -xz -C /opt/cni/bin
-            # Verify installation
             ls -la /opt/cni/bin
 
         - name: Ensure Docker is running
@@ -253,12 +246,11 @@ jobs:
             sudo systemctl start docker
             sudo usermod -aG docker $USER
             newgrp docker
-        
+
         - name: Configure crictl to use cri-dockerd
           run: |
             sudo mkdir -p /etc/crictl
             echo 'runtime-endpoint: unix:///var/run/cri-dockerd.sock' | sudo tee /etc/crictl/crictl.yaml
-            # Verify crictl can connect to cri-dockerd
             crictl ps || echo "crictl ps failed, continuing anyway"
 
         - name: Install kubectl
