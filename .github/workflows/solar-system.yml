@@ -439,6 +439,26 @@ jobs:
             minikube start --driver=docker --kubernetes-version=v1.32.0 --memory 4096 --cpus 2
             kubectl cluster-info --request-timeout=60s
 
+        - name: Recreate Namespace and Deployments
+          run: |
+            kubectl create namespace ${{ vars.NAMESPACE }} --dry-run=client -o yaml | kubectl apply -f -
+            kubectl -n ${{ vars.NAMESPACE }} create secret generic mongo-db-creds \
+              --from-literal=MONGO_URI=${{ env.MONGO_URI }} \
+              --from-literal=MONGO_USERNAME=${{ vars.MONGO_USERNAME }} \
+              --from-literal=MONGO_PASSWORD=${{ secrets.MONGO_PASSWORD }} \
+              --save-config \
+              --dry-run=client \
+              -o yaml | kubectl apply -f -
+            kubectl apply -f kubernetes/development
+            echo "Waiting for pods to be ready..."
+            kubectl -n ${{ vars.NAMESPACE }} wait --for=condition=ready pod -l app=solar-system --timeout=300s || {
+              echo "Error: Pods not ready after 300s"
+              kubectl -n ${{ vars.NAMESPACE }} describe pod -l app=solar-system
+              kubectl -n ${{ vars.NAMESPACE }} logs -l app=solar-system --all-containers=true
+              exit 1
+            }
+            kubectl -n ${{ vars.NAMESPACE }} get pods
+
         - name: Test Application with Port Forwarding
           env:
             URL: ${{ needs.dev-deploy.outputs.APP_INGRESS_URL }}
