@@ -352,7 +352,7 @@ jobs:
 
         - name: Upload Minikube Config
           run: |
-            tar -czf minikube-config.tar.gz -C ~ .minikube
+            tar -czf minikube-config.tar.gz -C ~ .minikube .kube/config 
         - uses: actions/upload-artifact@v4
           with:
             name: minikube-config
@@ -430,8 +430,6 @@ jobs:
           run: |
             tar -xzf minikube-config.tar.gz -C ~
             mkdir -p ~/.kube
-            cp ~/.minikube/config ~/.kube/config
-            chmod 600 ~/.kube/config
             kubectl cluster-info --request-timeout=60s
 
         - name: Test Application with Port Forwarding
