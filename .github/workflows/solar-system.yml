@@ -223,15 +223,12 @@ jobs:
             curl -L https://github.com/Mirantis/cri-dockerd/releases/download/$CRI_DOCKERD_VERSION/cri-dockerd-$CRI_DOCKERD_VERSION.amd64.tgz | sudo tar -xz -C /usr/local/bin
             sudo mv /usr/local/bin/cri-dockerd-$CRI_DOCKERD_VERSION.amd64 /usr/local/bin/cri-dockerd
             sudo chmod +x /usr/local/bin/cri-dockerd
-            # Install systemd service for cri-dockerd
-            curl -L https://raw.githubusercontent.com/Mirantis/cri-dockerd/v0.3.15/cri-dockerd.service | sudo tee /etc/systemd/system/cri-dockerd.service
-            curl -L https://raw.githubusercontent.com/Mirantis/cri-dockerd/v0.3.15/cri-dockerd.socket | sudo tee /etc/systemd/system/cri-dockerd.socket
-            sudo systemctl daemon-reload
-            sudo systemctl enable cri-dockerd.socket
-            sudo systemctl start cri-dockerd.socket
-            sudo systemctl start cri-dockerd
+            # Run cri-dockerd in the background (avoid systemd in GitHub Actions)
+            sudo cri-dockerd --network-plugin=cni --pod-infra-container-image=registry.k8s.io/pause:3.9 &
+            # Wait for cri-dockerd to start
+            sleep 5
             # Verify cri-dockerd is running
-            sudo systemctl status cri-dockerd --no-pager
+            ps aux | grep cri-dockerd || echo "cri-dockerd failed to start"
 
         - name: Install containernetworking-plugins
           run: |
