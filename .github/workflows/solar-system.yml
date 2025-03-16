@@ -350,6 +350,16 @@ jobs:
           run: |
             echo "APP_INGRESS_HOST=$(kubectl -n ${{ vars.NAMESPACE }} get ingress -o jsonpath="{.items[0].spec.tls[0].hosts[0]}")" >> "$GITHUB_OUTPUT"
 
+        - name: Upload kubeconfig
+          run: |
+            mkdir -p kubeconfig
+            cp ~/.kube/config kubeconfig/kubeconfig
+        - uses: actions/upload-artifact@v4
+          with:
+            name: kubeconfig
+            path: kubeconfig/kubeconfig
+            retention-days: 1
+
 
         # - name: Install kubectl CLI
         #   uses: azure/setup-kubectl@v4
@@ -411,6 +421,19 @@ jobs:
             chmod +x kubectl
             sudo mv kubectl /usr/local/bin/
             kubectl version --client
+
+        - name: Download kubeconfig
+          uses: actions/download-artifact@v4
+          with:
+            name: kubeconfig
+            path: kubeconfig
+        - name: Set up kubeconfig
+          run: |
+            mkdir -p ~/.kube
+            cp kubeconfig/kubeconfig ~/.kube/config
+            chmod 600 ~/.kube/config
+            kubectl cluster-info --request-timeout=60s
+
         - name: Test Application with Port Forwarding
           env:
             URL: ${{ needs.dev-deploy.outputs.APP_INGRESS_URL }}
