@@ -350,14 +350,13 @@ jobs:
           run: |
             echo "APP_INGRESS_HOST=$(kubectl -n ${{ vars.NAMESPACE }} get ingress -o jsonpath="{.items[0].spec.tls[0].hosts[0]}")" >> "$GITHUB_OUTPUT"
 
-        - name: Upload kubeconfig
+        - name: Upload Minikube Config
           run: |
-            mkdir -p kubeconfig
-            cp ~/.kube/config kubeconfig/kubeconfig
+            tar -czf minikube-config.tar.gz -C ~ .minikube
         - uses: actions/upload-artifact@v4
           with:
-            name: kubeconfig
-            path: kubeconfig/kubeconfig
+            name: minikube-config
+            path: minikube-config.tar.gz
             retention-days: 1
 
 
@@ -422,15 +421,16 @@ jobs:
             sudo mv kubectl /usr/local/bin/
             kubectl version --client
 
-        - name: Download kubeconfig
+        - name: Download Minikube Config
           uses: actions/download-artifact@v4
           with:
-            name: kubeconfig
-            path: kubeconfig
-        - name: Set up kubeconfig
+            name: minikube-config
+            path: .
+        - name: Set up Minikube Config
           run: |
+            tar -xzf minikube-config.tar.gz -C ~
             mkdir -p ~/.kube
-            cp kubeconfig/kubeconfig ~/.kube/config
+            cp ~/.minikube/config ~/.kube/config
             chmod 600 ~/.kube/config
             kubectl cluster-info --request-timeout=60s
 
