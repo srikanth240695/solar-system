@@ -454,14 +454,15 @@ jobs:
           with:
             tokenPrefix: '_{_'
             tokenSuffix: '_}_'
-            files: '["kubernetes/development/*.yaml"]'
+            files: '["kubernetes/development/deployment.yaml", "kubernetes/development/service.yaml"]'
           env:
             NAMESPACE: ${{ vars.NAMESPACE }}
             REPLICAS: ${{ vars.REPLICAS }}
             IMAGE: ${{ vars.DOCKERHUB_USERNAME}}/solar-system:${{ github.sha}}
             INGRESS_IP: ${{ env.INGRESS_IP}}
         - run: |
-            kubectl apply -f kubernetes/development
+            kubectl apply -f kubernetes/development/deployment.yaml
+            kubectl apply -f kubernetes/development/service.yaml
             echo "Waiting for pods to be ready..."
             kubectl -n ${{ vars.NAMESPACE }} wait --for=condition=ready pod -l app=solar-system --timeout=300s || {
               echo "Error: Pods not ready after 300s"
