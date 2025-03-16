@@ -293,7 +293,14 @@ jobs:
 
         - name: Save nginx Ingress controller IP as a GITHUB Environment Variable
           run: |
-            echo "INGRESS_IP = $(kubectl -n ingress-nginx get services ingress-nginx-controller -o jsonpath= "{.status.loadBalancer.ingress[0].ip}")" >> $GITHUB_ENV
+            run: |
+            # Start minikube tunnel to expose the LoadBalancer IP (required for ingress-nginx)
+            minikube tunnel &
+            sleep 10  # Give tunnel time to set up
+            INGRESS_IP=$(kubectl -n ingress-nginx get services ingress-nginx-controller -o jsonpath="{.status.loadBalancer.ingress[0].ip}" || echo "127.0.0.1")
+            echo "INGRESS_IP=$INGRESS_IP" >> $GITHUB_ENV
+            echo "Saved INGRESS_IP: $INGRESS_IP"
+            # echo "INGRESS_IP = $(kubectl -n ingress-nginx get services ingress-nginx-controller -o jsonpath= "{.status.loadBalancer.ingress[0].ip}")" >> $GITHUB_ENV
 
 
         - name: Replace token in Manifest files
@@ -301,7 +308,7 @@ jobs:
           with:
             tokenPrefix: '_{_'
             tokenSuffix: '_}_'
-            files: '["kubernetes\development\*.yaml"]'
+            files: '["kubernetes/development/*.yaml"]'
           env:
             NAMESPACE: ${{ vars.NAMESPACE }}
             REPLICAS: ${{ vars.REPLICAS }}
