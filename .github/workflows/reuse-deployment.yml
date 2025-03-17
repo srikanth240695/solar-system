@@ -1,0 +1,219 @@
+name: Deployment - Reusuable work flow
+
+on:
+    workflow_call: 
+
+jobs:
+    reuse-deploy:
+        environment: 
+            name: development
+            url: https://${{ steps.set-ingress-host-address.outputs.APP_INGRESS_HOST }}
+        outputs:
+            APP_INGRESS_URL: ${{ steps.set-ingress-host-address.outputs.APP_INGRESS_HOST }}
+        runs-on: ubuntu-latest
+        steps:
+            - name: checkout Repo
+              uses: actions/checkout@v4
+
+        # - name: Set up environment
+        #   run: |
+        #     sudo apt-get update
+        #     sudo apt-get install -y conntrack
+        
+        # - name: Install crictl
+        #   run: |
+        #     CRICTL_VERSION="v1.29.0"
+        #     echo "Installing crictl version $CRICTL_VERSION"
+        #     curl -L https://github.com/kubernetes-sigs/cri-tools/releases/download/$CRICTL_VERSION/crictl-$CRICTL_VERSION-linux-amd64.tar.gz | sudo tar -xz -C /usr/local/bin
+        #     sudo chmod +x /usr/local/bin/crictl
+        #     crictl --version
+
+        # - name: Install cri-dockerd
+        #   run: |
+        #     CRI_DOCKERD_VERSION="v0.3.15"
+        #     curl -L https://github.com/Mirantis/cri-dockerd/releases/download/$CRI_DOCKERD_VERSION/cri-dockerd-$CRI_DOCKERD_VERSION.amd64.tgz | sudo tar -xz -C /usr/local/bin
+        #     sudo mv /usr/local/bin/cri-dockerd-$CRI_DOCKERD_VERSION.amd64 /usr/local/bin/cri-dockerd
+        #     sudo chmod +x /usr/local/bin/cri-dockerd
+        #     # Run cri-dockerd in the background (avoid systemd in GitHub Actions)
+        #     sudo cri-dockerd --network-plugin=cni --pod-infra-container-image=registry.k8s.io/pause:3.9 &
+        #     # Wait for cri-dockerd to start
+        #     sleep 5
+        #     # Verify cri-dockerd is running
+        #     ps aux | grep cri-dockerd || echo "cri-dockerd failed to start"
+
+        # - name: Install containernetworking-plugins
+        #   run: |
+        #     CNI_PLUGIN_VERSION="v1.5.1"
+        #     echo "Installing containernetworking-plugins version $CNI_PLUGIN_VERSION"
+        #     sudo mkdir -p /opt/cni/bin
+        #     curl -L "https://github.com/containernetworking/plugins/releases/download/$CNI_PLUGIN_VERSION/cni-plugins-linux-amd64-$CNI_PLUGIN_VERSION.tgz" | sudo tar -xz -C /opt/cni/bin
+        #     ls -la /opt/cni/bin
+
+            - name: Ensure Docker is running
+              run: |
+                sudo systemctl start docker
+                sudo usermod -aG docker $USER
+                newgrp docker
+                docker info
+        
+            - name: Verify user context
+              run: |
+                whoami
+                groups
+                docker info --format '{{.ClientInfo}}'
+
+        # - name: Configure crictl to use cri-dockerd
+        #   run: |
+        #     sudo mkdir -p /etc/crictl
+        #     echo 'runtime-endpoint: unix:///var/run/cri-dockerd.sock' | sudo tee /etc/crictl/crictl.yaml
+        #     crictl ps || echo "crictl ps failed, continuing anyway"
+
+            - name: Install kubectl
+              run: |
+                curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+                chmod +x kubectl
+                sudo mv kubectl /usr/local/bin/
+                kubectl version --client
+            
+            - name: Install minikube
+              run: |
+                curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+                sudo install minikube-linux-amd64 /usr/local/bin/minikube
+                rm minikube-linux-amd64
+                minikube version
+
+            - name: Start minikube with docker driver
+              run: |
+                minikube start --driver=docker --kubernetes-version=v1.32.0 --memory 4096 --cpus 2
+
+            - name: Verify minikube cluster
+              run: |
+                minikube status
+                kubectl get nodes
+                kubectl get pods -A
+
+            - name: Debug Kubernetes Setup
+              run: |
+                cat ~/.kube/config
+                kubectl version --client
+                kubectl cluster-info --request-timeout=60s
+
+            - name: Fetch Kubernetes Cluster Details
+              run: |
+                kubectl get nodes --request-timeout=60s
+
+            - name: Save nginx Ingress controller IP as a GITHUB Environment Variable
+              run: |
+                # Start minikube tunnel to expose the LoadBalancer IP (required for ingress-nginx)
+                minikube tunnel &
+                sleep 10  # Give tunnel time to set up
+                INGRESS_IP=$(kubectl -n ingress-nginx get services ingress-nginx-controller -o jsonpath="{.status.loadBalancer.ingress[0].ip}" || echo "127.0.0.1")
+                echo "INGRESS_IP=$INGRESS_IP" >> $GITHUB_ENV
+                echo "Saved INGRESS_IP: $INGRESS_IP"
+                # echo "INGRESS_IP = $(kubectl -n ingress-nginx get services ingress-nginx-controller -o jsonpath= "{.status.loadBalancer.ingress[0].ip}")" >> $GITHUB_ENV
+
+
+            - name: Replace token in Manifest files
+              uses: cschleiden/replace-tokens@v1
+              with:
+                tokenPrefix: '_{_'
+                tokenSuffix: '_}_'
+                files: '["kubernetes/development/*.yaml"]'
+              env:
+                NAMESPACE: ${{ vars.NAMESPACE }}
+                REPLICAS: ${{ vars.REPLICAS }}
+                IMAGE: ${{ vars.DOCKERHUB_USERNAME}}/solar-system:${{ github.sha}}
+                INGRESS_IP: ${{ env.INGRESS_IP}}
+
+            - name: Check files
+              run: | 
+                cat kubernetes/development/*.yaml
+
+            - name: Create Development Namespace
+              run: |
+                kubectl create namespace ${{ vars.NAMESPACE }} --dry-run=client -o yaml | kubectl apply -f -
+                kubectl get namespaces
+
+            - name: create Mongo DB secret
+              run: |
+                kubectl -n ${{ vars.NAMESPACE }} create secret generic mongo-db-creds \
+                --from-literal=MONGO_URI=${{ env.MONGO_URI }} \
+                --from-literal=MONGO_USERNAME=${{ vars.MONGO_USERNAME }} \
+                --from-literal=MONGO_PASSWORD=${{ secrets.MONGO_PASSWORD }} \
+                --save-config \
+                --dry-run=client \
+                -o yaml | kubectl apply -f -
+
+            - name: Deploy to Dev env
+              run: |
+                kubectl apply -f kubernetes/development
+
+            - name: Verify Deployment
+              run: |
+                kubectl -n ${{ vars.NAMESPACE }} wait --for=condition=ready pod -l app=solar-system --timeout=300s
+                kubectl -n ${{ vars.NAMESPACE }} get pods
+            
+            - name: Set App Ingress Host URL
+              id: set-ingress-host-address
+              run: |
+                echo "APP_INGRESS_HOST=$(kubectl -n ${{ vars.NAMESPACE }} get ingress -o jsonpath="{.items[0].spec.tls[0].hosts[0]}")" >> "$GITHUB_OUTPUT"
+
+            - name: Upload Minikube Config
+              run: |
+                tar -czf minikube-config.tar.gz -C ~ .minikube .kube/config 
+            - uses: actions/upload-artifact@v4
+              with:
+                name: minikube-config-development
+                path: minikube-config.tar.gz
+                retention-days: 1
+
+
+        # - name: Install kubectl CLI
+        #   uses: azure/setup-kubectl@v4
+        #   with:
+        #     version: 'latest'
+
+        # - name: Decode and Set kubeconfig
+        #   run: |
+        #     mkdir -p $HOME/.kube
+        #     mkdir -p $HOME/.minikube/profiles/minikube
+        #     # Decode and save the certificate files
+        #     echo "${{ secrets.MINIKUBE_CA_CRT }}" | base64 --decode > $HOME/.minikube/ca.crt
+        #     echo "${{ secrets.MINIKUBE_CLIENT_CRT }}" | base64 --decode > $HOME/.minikube/profiles/minikube/client.crt
+        #     echo "${{ secrets.MINIKUBE_CLIENT_KEY }}" | base64 --decode > $HOME/.minikube/profiles/minikube/client.key
+        #     # Decode kubeconfig and fix paths
+        #     echo "${{ secrets.KUBECONFIG }}" | base64 --decode > $HOME/.kube/config
+        #     # Replace Windows paths with Unix paths
+        #     sed -i "s|C:\\\\Users\\\\6113534\\\\|$HOME/|g" $HOME/.kube/config
+        #     sed -i "s|\\\\|/|g" $HOME/.kube/config
+        #     export KUBECONFIG=$HOME/.kube/config
+        #     chmod 600 $HOME/.kube/config
+    
+        # - name: Debug Kubernetes Setup
+        #   run: |
+        #     ls -la $HOME/.kube/
+        #     ls -la $HOME/.minikube/profiles/minikube/
+        #     cat $HOME/.kube/config
+        #     # curl -k -v https://136.226.243.102:8443/api
+        #     kubectl version --client
+        #     kubectl cluster-info --request-timeout=60s
+    
+        # - name: Fetch Kubernetes Cluster Details
+        #   run: |
+        #     export KUBECONFIG=$HOME/.kube/config
+        #     kubectl version --client
+        #     kubectl get nodes --request-timeout=60s
+
+        # - name: Decode and Set kubeconfig ff
+        #   run: |
+        #     mkdir -p $HOME/.kube  # Ensure the directory exists
+        #     echo "${{ secrets.KUBECONFIG }}" | base64 --decode > $HOME/.kube/config
+        #     export KUBECONFIG=$HOME/.kube/config
+        #     chmod 600 $HOME/.kube/config  # Secure the kubeconfig file
+
+        # - name: Fetch Kubernetes Cluster Details
+        #   run: |
+        #     export KUBECONFIG=$HOME/.kube/config
+        #     kubectl version --client
+        #     echo -----------------------
+        #     kubectl get nodes
