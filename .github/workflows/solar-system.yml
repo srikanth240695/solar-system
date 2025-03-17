@@ -358,7 +358,7 @@ jobs:
             tar -czf minikube-config.tar.gz -C ~ .minikube .kube/config 
         - uses: actions/upload-artifact@v4
           with:
-            name: minikube-config
+            name: minikube-config-development
             path: minikube-config.tar.gz
             retention-days: 1
 
@@ -434,7 +434,7 @@ jobs:
         - name: Download Minikube Config
           uses: actions/download-artifact@v4
           with:
-            name: minikube-config
+            name: minikube-config-development
             path: .
         - name: Set up Minikube Config
           run: |
@@ -636,7 +636,7 @@ jobs:
             tar -czf minikube-config.tar.gz -C ~ .minikube .kube/config 
         - uses: actions/upload-artifact@v4
           with:
-            name: minikube-config
+            name: minikube-config-production
             path: minikube-config.tar.gz
             retention-days: 1
 
@@ -661,7 +661,7 @@ jobs:
         - name: Download Minikube Config
           uses: actions/download-artifact@v4
           with:
-            name: minikube-config
+            name: minikube-config-production
             path: .
         - name: Set up Minikube Config
           run: |
