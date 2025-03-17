@@ -203,6 +203,9 @@ jobs:
       uses: srikanth240695/solar-system/.github/workflows/reuse-deployment.yml@feature/Exploring-Workflows
       with:
         environment_name: development
+      secrets: 
+        k8s-kubeconfig: ${{ secrets.KUBECONFIG }}
+        mangodb-password: ${{ secrets.MONGO_PASSWORD }}
 
     dev-Integration-testing:
         name: Dev Integration Testing
@@ -319,6 +322,10 @@ jobs:
       uses: srikanth240695/solar-system/.github/workflows/reuse-deployment.yml@feature/Exploring-Workflows
       with:
         environment_name: production
+      secrets: 
+        k8s-kubeconfig: ${{ secrets.KUBECONFIG }}
+        mangodb-password: ${{ secrets.MONGO_PASSWORD }}
+
 
     prod-Integration-testing:
         name: Prod Integration Testing
