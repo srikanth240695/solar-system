@@ -223,10 +223,10 @@ jobs:
            rm minikube-linux-amd64
            minikube version
 
-        - name: Download Minikube Config
+        - name: Download Minikube Config - ${{ inputs.environment_name }}
           uses: actions/download-artifact@v4
           with:
-            name: minikube-config-development
+            name: minikube-config - ${{ inputs.environment_name }}
             path: .
         - name: Set up Minikube Config
           run: |
