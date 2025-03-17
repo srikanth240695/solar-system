@@ -466,6 +466,11 @@ jobs:
             echo "Checking deployment status..."
             kubectl -n ${{ vars.NAMESPACE }} get deployment -o wide
             kubectl -n ${{ vars.NAMESPACE }} get pods -o wide
+            echo "Waiting for scheduler to create pods (30s delay)..."
+            sleep 30
+            kubectl -n ${{ vars.NAMESPACE }} get pods -o wide
+            echo "Fetching cluster events..."
+            kubectl get events -n ${{ vars.NAMESPACE }}
             echo "Waiting for pods to be ready..."
             kubectl -n ${{ vars.NAMESPACE }} wait --for=condition=ready pod -l app=solar-system --timeout=600s || {
               echo "Error: Pods not ready after 600s"
@@ -474,7 +479,8 @@ jobs:
               kubectl -n ${{ vars.NAMESPACE }} get pods -o wide
               kubectl -n ${{ vars.NAMESPACE }} describe pod -l app=solar-system || echo "No pods to describe"
               kubectl -n ${{ vars.NAMESPACE }} logs --all-containers=true --prefix -l app=solar-system || echo "No logs available"
-              kubectl -n ${{ vars.NAMESPACE }} get events
+              kubectl get events -n ${{ vars.NAMESPACE }} --sort-by='.metadata.creationTimestamp'
+              kubectl describe node minikube
               exit 1
             }
             kubectl -n ${{ vars.NAMESPACE }} get pods
