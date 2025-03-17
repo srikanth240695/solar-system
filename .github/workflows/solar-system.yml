@@ -493,7 +493,7 @@ jobs:
             echo "Listing services in namespace ${{ vars.NAMESPACE }}:"
             kubectl -n ${{ vars.NAMESPACE }} get svc
             echo "Setting up port-forward..."
-            kubectl -n ${{ vars.NAMESPACE }} port-forward service/solar-system-service 3000:3000 &
+            kubectl -n ${{ vars.NAMESPACE }} port-forward service/solar-system 3000:3000 &
             sleep 15
             echo "Testing: http://localhost:3000/live"
             echo "-----------------------"
