@@ -2,6 +2,11 @@ name: Deployment - Reusuable work flow
 
 on:
     workflow_call: 
+      inputs:
+       environment_name:
+        description: 'The environment to deploy to (development or production)'
+        required: true
+        type: string
 
 jobs:
     reuse-deploy:

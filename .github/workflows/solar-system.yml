@@ -2,11 +2,6 @@ name: Solar System WorkFlow
 
 on:
     workflow_dispatch:
-      inputs:
-        environment_name:
-          description: 'The environment to deploy to (development or production)'
-          required: true
-          type: string
     push:
         branches:
             - main
