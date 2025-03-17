@@ -199,6 +199,11 @@ jobs:
     
     dev-deploy:
       needs: docker
+      environment: 
+        name: development
+        url: https://${{ steps.set-ingress-host-address.outputs.APP_INGRESS_HOST }}
+      outputs:
+        APP_INGRESS_URL: ${{ steps.set-ingress-host-address.outputs.APP_INGRESS_HOST }}
       runs-on: ubuntu-latest
       steps:
         - name: checkout Repo
@@ -319,6 +324,11 @@ jobs:
           run: | 
             cat kubernetes/development/*.yaml
 
+        - name: Create Development Namespace
+          run: |
+            kubectl create namespace ${{ vars.NAMESPACE }} --dry-run=client -o yaml | kubectl apply -f -
+            kubectl get namespaces
+
         - name: create Mongo DB secret
           run: |
             kubectl -n ${{ vars.NAMESPACE }} create secret generic mongo-db-creds \
@@ -331,7 +341,26 @@ jobs:
 
         - name: Deploy to Dev env
           run: |
-            kebectl apply -f kubernetes/development
+            kubectl apply -f kubernetes/development
+
+        - name: Verify Deployment
+          run: |
+            kubectl -n ${{ vars.NAMESPACE }} wait --for=condition=ready pod -l app=solar-system --timeout=300s
+            kubectl -n ${{ vars.NAMESPACE }} get pods
+        
+        - name: Set App Ingress Host URL
+          id: set-ingress-host-address
+          run: |
+            echo "APP_INGRESS_HOST=$(kubectl -n ${{ vars.NAMESPACE }} get ingress -o jsonpath="{.items[0].spec.tls[0].hosts[0]}")" >> "$GITHUB_OUTPUT"
+
+        - name: Upload Minikube Config
+          run: |
+            tar -czf minikube-config.tar.gz -C ~ .minikube .kube/config 
+        - uses: actions/upload-artifact@v4
+          with:
+            name: minikube-config-development
+            path: minikube-config.tar.gz
+            retention-days: 1
 
 
         # - name: Install kubectl CLI
@@ -383,4 +412,332 @@ jobs:
         #     kubectl version --client
         #     echo -----------------------
         #     kubectl get nodes
-          
+
+    dev-Integration-testing:
+        name: Dev Integration Testing
+        needs: dev-deploy
+        runs-on: ubuntu-latest
+        steps:
+        - uses: actions/checkout@v4
+        - run: |
+            curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+            chmod +x kubectl
+            sudo mv kubectl /usr/local/bin/
+            kubectl version --client
+
+        - run: |
+           curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+           sudo install minikube-linux-amd64 /usr/local/bin/minikube
+           rm minikube-linux-amd64
+           minikube version
+
+        - name: Download Minikube Config
+          uses: actions/download-artifact@v4
+          with:
+            name: minikube-config-development
+            path: .
+        - name: Set up Minikube Config
+          run: |
+            tar -xzf minikube-config.tar.gz -C ~
+            chmod 600 ~/.kube/config
+            minikube start --driver=docker --kubernetes-version=v1.32.0 --memory 4096 --cpus 2
+            kubectl cluster-info --request-timeout=60s
+
+        - name: Recreate Namespace and Deployments
+          run: |
+            kubectl create namespace ${{ vars.NAMESPACE }} --dry-run=client -o yaml | kubectl apply -f -
+            kubectl -n ${{ vars.NAMESPACE }} create secret generic mongo-db-creds \
+              --from-literal=MONGO_URI=${{ env.MONGO_URI }} \
+              --from-literal=MONGO_USERNAME=${{ vars.MONGO_USERNAME }} \
+              --from-literal=MONGO_PASSWORD=${{ secrets.MONGO_PASSWORD }} \
+              --save-config \
+              --dry-run=client \
+              -o yaml | kubectl apply -f -
+            echo "Replacing tokens in manifest files..."
+        - uses: cschleiden/replace-tokens@v1
+          with:
+            tokenPrefix: '_{_'
+            tokenSuffix: '_}_'
+            files: '["kubernetes/development/deployment.yaml", "kubernetes/development/service.yaml"]'
+          env:
+            NAMESPACE: ${{ vars.NAMESPACE }}
+            REPLICAS: ${{ vars.REPLICAS }}
+            IMAGE: ${{ vars.DOCKERHUB_USERNAME}}/solar-system:${{ github.sha}}
+            INGRESS_IP: ${{ env.INGRESS_IP}}
+        - run: |
+            kubectl apply -f kubernetes/development/deployment.yaml
+            kubectl apply -f kubernetes/development/service.yaml
+            echo "Checking deployment status..."
+            kubectl -n ${{ vars.NAMESPACE }} get deployment -o wide
+            kubectl -n ${{ vars.NAMESPACE }} get pods -o wide
+            echo "Waiting for scheduler to create pods (30s delay)..."
+            sleep 30
+            kubectl -n ${{ vars.NAMESPACE }} get pods -o wide
+            echo "Fetching cluster events..."
+            kubectl get events -n ${{ vars.NAMESPACE }}
+            echo "Waiting for pods to be ready..."
+            kubectl -n ${{ vars.NAMESPACE }} wait --for=condition=ready pod -l app=solar-system --timeout=600s || {
+              echo "Error: Pods not ready after 600s"
+              kubectl -n ${{ vars.NAMESPACE }} get all -o wide
+              kubectl -n ${{ vars.NAMESPACE }} describe deployment solar-system
+              kubectl -n ${{ vars.NAMESPACE }} get pods -o wide
+              kubectl -n ${{ vars.NAMESPACE }} describe pod -l app=solar-system || echo "No pods to describe"
+              kubectl -n ${{ vars.NAMESPACE }} logs --all-containers=true --prefix -l app=solar-system || echo "No logs available"
+              kubectl get events -n ${{ vars.NAMESPACE }} --sort-by='.metadata.creationTimestamp'
+              kubectl describe node minikube
+              exit 1
+            }
+            kubectl -n ${{ vars.NAMESPACE }} get pods
+
+        - name: Test Application with Port Forwarding
+          env:
+            URL: ${{ needs.dev-deploy.outputs.APP_INGRESS_URL }}
+          run: |
+            echo "Ingress URL (for reference): https://$URL/live"
+            echo "Listing services in namespace ${{ vars.NAMESPACE }}:"
+            kubectl -n ${{ vars.NAMESPACE }} get svc
+            echo "Setting up port-forward..."
+            kubectl -n ${{ vars.NAMESPACE }} port-forward service/solar-system 3000:3000 &
+            sleep 15
+            echo "Testing: http://localhost:3000/live"
+            echo "-----------------------"
+            RESPONSE=$(curl -s --retry 5 --retry-delay 5 "http://localhost:3000/live")
+            echo "Raw response: $RESPONSE"
+            if [ -z "$RESPONSE" ]; then
+              echo "Error: No response from the service"
+              exit 1
+            fi
+            echo "$RESPONSE" | jq -r .status | grep -i live || {
+              echo "API test failed"
+              echo "Curl exit code: $?"
+              kubectl -n ${{ vars.NAMESPACE }} describe pod -l app=solar-system
+              kubectl -n ${{ vars.NAMESPACE }} logs -l app=solar-system --all-containers=true
+              exit 1
+            }
+
+    prod-deploy:
+      needs: dev-Integration-testing
+      environment: 
+        name: production
+        url: https://${{ steps.set-ingress-host-address.outputs.APP_INGRESS_HOST }}
+      outputs:
+        APP_INGRESS_URL: ${{ steps.set-ingress-host-address.outputs.APP_INGRESS_HOST }}
+      runs-on: ubuntu-latest
+      steps:
+        - name: checkout Repo
+          uses: actions/checkout@v4
+
+        - name: Ensure Docker is running
+          run: |
+            sudo systemctl start docker
+            sudo usermod -aG docker $USER
+            newgrp docker
+            docker info
+        
+        - name: Verify user context
+          run: |
+            whoami
+            groups
+            docker info --format '{{.ClientInfo}}'
+
+        - name: Install kubectl
+          run: |
+            curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+            chmod +x kubectl
+            sudo mv kubectl /usr/local/bin/
+            kubectl version --client
+        
+        - name: Install minikube
+          run: |
+            curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+            sudo install minikube-linux-amd64 /usr/local/bin/minikube
+            rm minikube-linux-amd64
+            minikube version
+
+        - name: Start minikube with docker driver
+          run: |
+            minikube start --driver=docker --kubernetes-version=v1.32.0 --memory 4096 --cpus 2
+
+        - name: Verify minikube cluster
+          run: |
+            minikube status
+            kubectl get nodes
+            kubectl get pods -A
+
+        - name: Debug Kubernetes Setup
+          run: |
+            cat ~/.kube/config
+            kubectl version --client
+            kubectl cluster-info --request-timeout=60s
+
+        - name: Fetch Kubernetes Cluster Details
+          run: |
+            kubectl get nodes --request-timeout=60s
+
+        - name: Save nginx Ingress controller IP as a GITHUB Environment Variable
+          run: |
+            run: |
+            # Start minikube tunnel to expose the LoadBalancer IP (required for ingress-nginx)
+            minikube tunnel &
+            sleep 10  # Give tunnel time to set up
+            INGRESS_IP=$(kubectl -n ingress-nginx get services ingress-nginx-controller -o jsonpath="{.status.loadBalancer.ingress[0].ip}" || echo "127.0.0.1")
+            echo "INGRESS_IP=$INGRESS_IP" >> $GITHUB_ENV
+            echo "Saved INGRESS_IP: $INGRESS_IP"
+            # echo "INGRESS_IP = $(kubectl -n ingress-nginx get services ingress-nginx-controller -o jsonpath= "{.status.loadBalancer.ingress[0].ip}")" >> $GITHUB_ENV
+
+
+        - name: Replace token in Manifest files
+          uses: cschleiden/replace-tokens@v1
+          with:
+            tokenPrefix: '_{_'
+            tokenSuffix: '_}_'
+            files: '["kubernetes/production/*.yaml"]'
+          env:
+            NAMESPACE: ${{ vars.NAMESPACE }}
+            REPLICAS: ${{ vars.REPLICAS }}
+            IMAGE: ${{ vars.DOCKERHUB_USERNAME}}/solar-system:${{ github.sha}}
+            INGRESS_IP: ${{ env.INGRESS_IP}}
+
+        - name: Check files
+          run: | 
+            cat kubernetes/production/*.yaml
+
+        - name: Create Production Namespace
+          run: |
+            kubectl create namespace ${{ vars.NAMESPACE }} --dry-run=client -o yaml | kubectl apply -f -
+            kubectl get namespaces
+
+        - name: create Mongo DB secret
+          run: |
+            kubectl -n ${{ vars.NAMESPACE }} create secret generic mongo-db-creds \
+            --from-literal=MONGO_URI=${{ env.MONGO_URI }} \
+            --from-literal=MONGO_USERNAME=${{ vars.MONGO_USERNAME }} \
+            --from-literal=MONGO_PASSWORD=${{ secrets.MONGO_PASSWORD }} \
+            --save-config \
+            --dry-run=client \
+            -o yaml | kubectl apply -f -
+
+        - name: Deploy to Prod env
+          run: |
+            kubectl apply -f kubernetes/production
+
+        - name: Verify Deployment
+          run: |
+            kubectl -n ${{ vars.NAMESPACE }} wait --for=condition=ready pod -l app=solar-system --timeout=300s
+            kubectl -n ${{ vars.NAMESPACE }} get pods
+        
+        - name: Set App Ingress Host URL
+          id: set-ingress-host-address
+          run: |
+            echo "APP_INGRESS_HOST=$(kubectl -n ${{ vars.NAMESPACE }} get ingress -o jsonpath="{.items[0].spec.tls[0].hosts[0]}")" >> "$GITHUB_OUTPUT"
+
+        - name: Upload Minikube Config
+          run: |
+            tar -czf minikube-config.tar.gz -C ~ .minikube .kube/config 
+        - uses: actions/upload-artifact@v4
+          with:
+            name: minikube-config-production
+            path: minikube-config.tar.gz
+            retention-days: 1
+
+    prod-Integration-testing:
+        name: Prod Integration Testing
+        needs: prod-deploy
+        runs-on: ubuntu-latest
+        steps:
+        - uses: actions/checkout@v4
+        - run: |
+            curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+            chmod +x kubectl
+            sudo mv kubectl /usr/local/bin/
+            kubectl version --client
+
+        - run: |
+           curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+           sudo install minikube-linux-amd64 /usr/local/bin/minikube
+           rm minikube-linux-amd64
+           minikube version
+
+        - name: Download Minikube Config
+          uses: actions/download-artifact@v4
+          with:
+            name: minikube-config-production
+            path: .
+        - name: Set up Minikube Config
+          run: |
+            tar -xzf minikube-config.tar.gz -C ~
+            chmod 600 ~/.kube/config
+            minikube start --driver=docker --kubernetes-version=v1.32.0 --memory 4096 --cpus 2
+            kubectl cluster-info --request-timeout=60s
+
+        - name: Recreate Namespace and Deployments
+          run: |
+            kubectl create namespace ${{ vars.NAMESPACE }} --dry-run=client -o yaml | kubectl apply -f -
+            kubectl -n ${{ vars.NAMESPACE }} create secret generic mongo-db-creds \
+              --from-literal=MONGO_URI=${{ env.MONGO_URI }} \
+              --from-literal=MONGO_USERNAME=${{ vars.MONGO_USERNAME }} \
+              --from-literal=MONGO_PASSWORD=${{ secrets.MONGO_PASSWORD }} \
+              --save-config \
+              --dry-run=client \
+              -o yaml | kubectl apply -f -
+            echo "Replacing tokens in manifest files..."
+        - uses: cschleiden/replace-tokens@v1
+          with:
+            tokenPrefix: '_{_'
+            tokenSuffix: '_}_'
+            files: '["kubernetes/production/deployment.yaml", "kubernetes/production/service.yaml"]'
+          env:
+            NAMESPACE: ${{ vars.NAMESPACE }}
+            REPLICAS: ${{ vars.REPLICAS }}
+            IMAGE: ${{ vars.DOCKERHUB_USERNAME}}/solar-system:${{ github.sha}}
+            INGRESS_IP: ${{ env.INGRESS_IP}}
+        - run: |
+            kubectl apply -f kubernetes/production/deployment.yaml
+            kubectl apply -f kubernetes/production/service.yaml
+            echo "Checking deployment status..."
+            kubectl -n ${{ vars.NAMESPACE }} get deployment -o wide
+            kubectl -n ${{ vars.NAMESPACE }} get pods -o wide
+            echo "Waiting for scheduler to create pods (30s delay)..."
+            sleep 30
+            kubectl -n ${{ vars.NAMESPACE }} get pods -o wide
+            echo "Fetching cluster events..."
+            kubectl get events -n ${{ vars.NAMESPACE }}
+            echo "Waiting for pods to be ready..."
+            kubectl -n ${{ vars.NAMESPACE }} wait --for=condition=ready pod -l app=solar-system --timeout=600s || {
+              echo "Error: Pods not ready after 600s"
+              kubectl -n ${{ vars.NAMESPACE }} get all -o wide
+              kubectl -n ${{ vars.NAMESPACE }} describe deployment solar-system
+              kubectl -n ${{ vars.NAMESPACE }} get pods -o wide
+              kubectl -n ${{ vars.NAMESPACE }} describe pod -l app=solar-system || echo "No pods to describe"
+              kubectl -n ${{ vars.NAMESPACE }} logs --all-containers=true --prefix -l app=solar-system || echo "No logs available"
+              kubectl get events -n ${{ vars.NAMESPACE }} --sort-by='.metadata.creationTimestamp'
+              kubectl describe node minikube
+              exit 1
+            }
+            kubectl -n ${{ vars.NAMESPACE }} get pods
+
+        - name: Test Application with Port Forwarding
+          env:
+            URL: ${{ needs.prod-deploy.outputs.APP_INGRESS_URL }}
+          run: |
+            echo "Ingress URL (for reference): https://$URL/live"
+            echo "Listing services in namespace ${{ vars.NAMESPACE }}:"
+            kubectl -n ${{ vars.NAMESPACE }} get svc
+            echo "Setting up port-forward..."
+            kubectl -n ${{ vars.NAMESPACE }} port-forward service/solar-system 3000:3000 &
+            sleep 15
+            echo "Testing: http://localhost:3000/live"
+            echo "-----------------------"
+            RESPONSE=$(curl -s --retry 5 --retry-delay 5 "http://localhost:3000/live")
+            echo "Raw response: $RESPONSE"
+            if [ -z "$RESPONSE" ]; then
+              echo "Error: No response from the service"
+              exit 1
+            fi
+            echo "$RESPONSE" | jq -r .status | grep -i live || {
+              echo "API test failed"
+              echo "Curl exit code: $?"
+              kubectl -n ${{ vars.NAMESPACE }} describe pod -l app=solar-system
+              kubectl -n ${{ vars.NAMESPACE }} logs -l app=solar-system --all-containers=true
+              exit 1
+            }
