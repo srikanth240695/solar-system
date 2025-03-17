@@ -168,7 +168,7 @@ jobs:
                 tar -czf minikube-config.tar.gz -C ~ .minikube .kube/config 
             - uses: actions/upload-artifact@v4
               with:
-                name: minikube-config - ${{ inputs.environment_name }}
+                name: minikube-config-${{ inputs.environment_name }}
                 path: minikube-config.tar.gz
                 retention-days: 1
 
