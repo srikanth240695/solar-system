@@ -18,7 +18,7 @@ on:
        kubectl-version:
         description: provide the required kubectl version
         required: true
-        default: latest
+        default: 'v1.26.0'
         type: string
        k8s-manifest-dir:
         description: provide the deployment environment
