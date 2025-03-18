@@ -205,6 +205,7 @@ jobs:
         environment_name: development
         mongodb-uri: ${{ vars.MONGO_URI}}
         k8s-manifest-dir: kubernetes/development/
+        kubectl-version: v1.32.0
       secrets: 
         k8s-kubeconfig: ${{ secrets.KUBECONFIG }}
         mangodb-password: ${{ secrets.MONGO_PASSWORD }}
@@ -327,6 +328,7 @@ jobs:
         environment_name: production
         mongodb-uri: ${{ vars.MONGO_URI}}
         k8s-manifest-dir: kubernetes/production/
+        kubectl-version: v1.32.0
       secrets: 
         k8s-kubeconfig: ${{ secrets.KUBECONFIG }}
         mangodb-password: ${{ secrets.MONGO_PASSWORD }}
