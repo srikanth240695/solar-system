@@ -15,11 +15,11 @@ on:
        mongodb-uri:
         required: true
         type: string
-      #  kubectl-version:
-      #   description: provide the required kubectl version
-      #   required: true
-      #   default: 'v1.26.0'
-      #   type: string
+       kubectl-version:
+        description: provide the required kubectl version
+        required: true
+        default: 'v1.26.0'
+        type: string
        k8s-manifest-dir:
         description: provide the deployment environment
         default: dev

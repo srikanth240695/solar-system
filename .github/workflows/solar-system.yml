@@ -326,6 +326,7 @@ jobs:
       with:
         environment_name: production
         mongodb-uri: ${{ vars.MONGO_URI}}
+        k8s-manifest-dir: kubernetes/production/
       secrets: 
         k8s-kubeconfig: ${{ secrets.KUBECONFIG }}
         mangodb-password: ${{ secrets.MONGO_PASSWORD }}
