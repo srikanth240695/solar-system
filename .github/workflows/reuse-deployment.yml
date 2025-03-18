@@ -26,15 +26,15 @@ on:
         required: true
         type: string
       outputs:
-        APP_INGRESS_URL: ${{ steps.set-ingress-host-address.outputs.APP_INGRESS_HOST }}
-        NAMESPACE: ${{ inputs.environment_name }}
+        APP_INGRESS_URL: {}
+        NAMESPACE: {}
 
 
 jobs:
     reuse-deploy:
         environment: 
             name: ${{ inputs.environment_name }}
-            url: https://${{ steps.set-ingress-host-address.outputs.APP_INGRESS_HOST }}
+            url: https://${{ jobs.reuse-deploy.outputs.APP_INGRESS_URL }}
         outputs:
             APP_INGRESS_URL: ${{ steps.set-ingress-host-address.outputs.APP_INGRESS_HOST }}
             NAMESPACE: ${{ inputs.environment_name }}
