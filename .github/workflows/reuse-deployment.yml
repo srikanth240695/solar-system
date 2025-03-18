@@ -145,7 +145,7 @@ jobs:
                 files: '["{{ inputs.k8s-manifest-dir }}/*.yaml"]'
                 # files: '["kubernetes/${{ inputs.environment_name }}/*.yaml"]'
               env:
-                NAMESPACE: ${{ vars.NAMESPACE }}
+                NAMESPACE: ${{ inputs.environment_name }}
                 REPLICAS: ${{ vars.REPLICAS }}
                 IMAGE: ${{ vars.DOCKERHUB_USERNAME}}/solar-system:${{ github.sha}}
                 INGRESS_IP: ${{ env.INGRESS_IP}}
@@ -156,9 +156,11 @@ jobs:
                 # cat kubernetes/${{ inputs.environment_name }}/*.yaml
 
 
-            - name: Create Development Namespace
+            - name: Create Namespace
               run: |
-                kubectl create namespace ${{ vars.NAMESPACE }} --dry-run=client -o yaml | kubectl apply -f -
+                NAMESPACE=${{ inputs.environment_name }}  # Set namespace dynamically
+                echo "Using namespace: $NAMESPACE"
+                kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
                 kubectl get namespaces
 
             - name: create Mongo DB secret
@@ -174,7 +176,7 @@ jobs:
             - name: Deploy to Dev env
               run: |
                 # kubectl apply -f kubernetes/${{ inputs.environment_name }}
-                kubectl apply -f ${{ inputs.k8s-manifest-dir }}
+                kubectl apply -f ${{ inputs.k8s-manifest-dir }} -n ${{ inputs.environment_name }}
                 
 
             - name: Verify Deployment
