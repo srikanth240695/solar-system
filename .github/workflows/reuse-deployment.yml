@@ -37,6 +37,7 @@ jobs:
             url: https://${{ steps.set-ingress-host-address.outputs.APP_INGRESS_HOST }}
         outputs:
             APP_INGRESS_URL: ${{ steps.set-ingress-host-address.outputs.APP_INGRESS_HOST }}
+            NAMESPACE: ${{ inputs.environment_name }}
         runs-on: ubuntu-latest
         steps:
             - name: checkout Repo
@@ -145,7 +146,7 @@ jobs:
               with:
                 tokenPrefix: '_{_'
                 tokenSuffix: '_}_'
-                files: '["{{ inputs.k8s-manifest-dir }}/*.yaml"]'
+                files: '["${{ inputs.k8s-manifest-dir }}/*.yaml"]'
                 # files: '["kubernetes/${{ inputs.environment_name }}/*.yaml"]'
               env:
                 NAMESPACE: ${{ inputs.environment_name }}
@@ -168,7 +169,7 @@ jobs:
 
             - name: create Mongo DB secret
               run: |
-                kubectl -n ${{ vars.NAMESPACE }} create secret generic mongo-db-creds \
+                kubectl -n ${{ inputs.environment_name }} create secret generic mongo-db-creds \
                 --from-literal=MONGO_URI=${{ inputs.mongodb-uri }} \
                 --from-literal=MONGO_USERNAME=${{ vars.MONGO_USERNAME }} \
                 --from-literal=MONGO_PASSWORD=${{ secrets.mangodb-password }} \
@@ -184,8 +185,8 @@ jobs:
 
             - name: Verify Deployment
               run: |
-                kubectl -n ${{ vars.NAMESPACE }} wait --for=condition=ready pod -l app=solar-system --timeout=300s
-                kubectl -n ${{ vars.NAMESPACE }} get pods
+                kubectl -n ${{ inputs.environment_name }} wait --for=condition=ready pod -l app=solar-system --timeout=300s
+                kubectl -n ${{ inputs.environment_name }} get pods
             
             - name: Set App Ingress Host URL
               id: set-ingress-host-address
