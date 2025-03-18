@@ -1,34 +1,37 @@
 name: Deployment - Reusuable work flow
 
 on:
-    workflow_call: 
-      secrets:
-        k8s-kubeconfig:
-          required: true
-        mangodb-password:
-          required: true
-      inputs:
-       environment_name:
+  workflow_call: 
+    secrets:
+      k8s-kubeconfig:
+        required: true
+      mangodb-password:
+        required: true
+    inputs:
+      environment_name:
         description: 'The environment to deploy to (development or production)'
         required: true
         type: string
-       mongodb-uri:
+      mongodb-uri:
         required: true
         type: string
-       kubectl-version:
+      kubectl-version:
         description: provide the required kubectl version
         required: true
         default: 'v1.26.0'
         type: string
-       k8s-manifest-dir:
+      k8s-manifest-dir:
         description: provide the deployment environment
         default: kubernetes/
         required: true
         type: string
-      outputs:
-        APP_INGRESS_URL: {}
-        NAMESPACE: {}
-
+    outputs:
+      APP_INGRESS_URL:
+        description: "The ingress URL of the deployed application"
+        value: ${{ jobs.reuse-deploy.outputs.APP_INGRESS_URL }}
+      NAMESPACE:
+        description: "The namespace used for deployment"
+        value: ${{ jobs.reuse-deploy.outputs.NAMESPACE }}
 
 jobs:
     reuse-deploy:
