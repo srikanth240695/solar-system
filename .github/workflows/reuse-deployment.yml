@@ -22,7 +22,7 @@ on:
         type: string
        k8s-manifest-dir:
         description: provide the deployment environment
-        default: dev
+        default: kubernetes/
         required: true
         type: string
 
@@ -142,7 +142,7 @@ jobs:
               with:
                 tokenPrefix: '_{_'
                 tokenSuffix: '_}_'
-                files: '["kubernetes/${{ inputs.k8s-manifest-dir }}/*.yaml"]'
+                files: '["{{ inputs.k8s-manifest-dir }}/*.yaml"]'
                 # files: '["kubernetes/${{ inputs.environment_name }}/*.yaml"]'
               env:
                 NAMESPACE: ${{ vars.NAMESPACE }}
@@ -152,8 +152,8 @@ jobs:
 
             - name: Check files
               run: | 
-                # cat kubernetes/${{ inputs.k8s-manifest-dir }}/*.yaml
-                cat kubernetes/${{ inputs.environment_name }}/*.yaml
+                cat ${{ inputs.k8s-manifest-dir }}/*.yaml
+                # cat kubernetes/${{ inputs.environment_name }}/*.yaml
 
 
             - name: Create Development Namespace
@@ -174,7 +174,7 @@ jobs:
             - name: Deploy to Dev env
               run: |
                 # kubectl apply -f kubernetes/${{ inputs.environment_name }}
-                kubectl apply -f kubernetes/${{ inputs.k8s-manifest-dir }}
+                kubectl apply -f ${{ inputs.k8s-manifest-dir }}
                 
 
             - name: Verify Deployment
