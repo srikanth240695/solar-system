@@ -12,6 +12,20 @@ on:
         description: 'The environment to deploy to (development or production)'
         required: true
         type: string
+       mongodb-uri:
+        required: true
+        type: string
+       kubectl-version:
+        description: provide the required kubectl version
+        required: true
+        default: latest
+        type: string
+       k8s-manifest-dir:
+        description: provide the deployment environment
+        default: dev
+        required: true
+        type: string
+
 
 jobs:
     reuse-deploy:
@@ -128,7 +142,8 @@ jobs:
               with:
                 tokenPrefix: '_{_'
                 tokenSuffix: '_}_'
-                files: '["kubernetes/${{ inputs.environment_name }}/*.yaml"]'
+                files: '["kubernetes/${{ inputs.k8s-manifest-dir }}/*.yaml"]'
+                # files: '["kubernetes/${{ inputs.environment_name }}/*.yaml"]'
               env:
                 NAMESPACE: ${{ vars.NAMESPACE }}
                 REPLICAS: ${{ vars.REPLICAS }}
@@ -137,7 +152,9 @@ jobs:
 
             - name: Check files
               run: | 
+                # cat kubernetes/${{ inputs.k8s-manifest-dir }}/*.yaml
                 cat kubernetes/${{ inputs.environment_name }}/*.yaml
+
 
             - name: Create Development Namespace
               run: |
@@ -147,7 +164,7 @@ jobs:
             - name: create Mongo DB secret
               run: |
                 kubectl -n ${{ vars.NAMESPACE }} create secret generic mongo-db-creds \
-                --from-literal=MONGO_URI=${{ env.MONGO_URI }} \
+                --from-literal=MONGO_URI=${{ inputs.mongodb-uri }} \
                 --from-literal=MONGO_USERNAME=${{ vars.MONGO_USERNAME }} \
                 --from-literal=MONGO_PASSWORD=${{ secrets.mangodb-password }} \
                 --save-config \
@@ -156,7 +173,9 @@ jobs:
 
             - name: Deploy to Dev env
               run: |
-                kubectl apply -f kubernetes/${{ inputs.environment_name }}
+                # kubectl apply -f kubernetes/${{ inputs.environment_name }}
+                kubectl apply -f kubernetes/${{ inputs.k8s-manifest-dir }}
+                
 
             - name: Verify Deployment
               run: |
