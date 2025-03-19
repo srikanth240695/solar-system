@@ -37,7 +37,7 @@ jobs:
     reuse-deploy:
         environment: 
             name: ${{ inputs.environment_name }}
-            url: https://${{ jobs.reuse-deploy.outputs.APP_INGRESS_URL }}
+            # url: https://${{ jobs.reuse-deploy.outputs.APP_INGRESS_URL }}
         outputs:
             APP_INGRESS_URL: ${{ steps.set-ingress-host-address.outputs.APP_INGRESS_HOST }}
             NAMESPACE: ${{ inputs.environment_name }}
@@ -206,6 +206,13 @@ jobs:
                 name: minikube-config-${{ inputs.environment_name }}
                 path: minikube-config.tar.gz
                 retention-days: 1
+
+            - name: Set Environment URL
+              if: success()
+              run: |
+                APP_URL="https://${{ steps.set-ingress-host-address.outputs.APP_INGRESS_HOST }}"
+                echo "Setting environment URL to: $APP_URL"
+                echo "::set-output name=environment_url::$APP_URL"
 
 
         # - name: Install kubectl CLI
