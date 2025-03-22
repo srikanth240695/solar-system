@@ -106,7 +106,7 @@ jobs:
           uses: actions/upload-artifact@v4
           with:
             name: code-coverage-result
-            path: coverage
+            path: cobertura-coverage.xml
             retention-days: 5 
           
     reports-s3:
@@ -123,7 +123,7 @@ jobs:
         - name: Downlaod Code Coverage Artifact
           uses: actions/download-artifact@v4
           with:
-            name: Code-Coverage-Result
+            name: code-coverage-result
 
         - name: Merge Test Files
           run: |
