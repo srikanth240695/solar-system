@@ -9,7 +9,7 @@ runs:
   using: "composite"
   steps:
       - name: Install Dependencies
-        run: npm install
+        run: npm ${{ inputs.command }}
         shell: bash
 
       - name: cache NPM dependencies
