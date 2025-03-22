@@ -118,7 +118,7 @@ jobs:
         - name: Downlaod Mocha Test Artifact
           uses: actions/download-artifact@v4
           with:
-            name: Mocha-Test-Result - ${{ matrix.operating_system }}-${{ matrix.nodejs_version }}
+            name: Mocha-Test-Result - ubuntu-latest-18
 
         - name: Downlaod Code Coverage Artifact
           uses: actions/download-artifact@v4
@@ -131,7 +131,7 @@ jobs:
             mkdir reports-${{ github.sha }}
             mv cobertura-coverage.xml reports-${{ github.sha }}/
             mv test-results.xml reports-${{ github.sha }}/
-            ls -ltr ${{ github.sha }}/
+            ls -ltr reports ${{ github.sha }}/
         
         - name: Upload to AWS S3
           run: echo "Uploading...."
