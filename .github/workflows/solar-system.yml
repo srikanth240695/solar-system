@@ -116,12 +116,12 @@ jobs:
       continue-on-error: true
       steps:
         - name: Downlaod Mocha Test Artifact
-          uses: actions/download-artifact@v3
+          uses: actions/download-artifact@v4
           with:
             name: Mocha-Test-Result
 
         - name: Downlaod Code Coverage Artifact
-          uses: actions/download-artifact@v3
+          uses: actions/download-artifact@v4
           with:
             name: Code-Coverage-Result
 
