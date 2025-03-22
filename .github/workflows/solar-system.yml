@@ -246,7 +246,6 @@ jobs:
         k8s-kubeconfig: ${{ secrets.KUBECONFIG }}
         mangodb-password: ${{ secrets.MONGO_PASSWORD }}
         
-
     dev-Integration-testing:
         name: Dev Integration Testing
         if: contains(github.ref, 'feature/')
@@ -369,7 +368,6 @@ jobs:
         k8s-kubeconfig: ${{ secrets.KUBECONFIG }}
         mangodb-password: ${{ secrets.MONGO_PASSWORD }}
 
-
     prod-Integration-testing:
         name: Prod Integration Testing
         if: github.ref == 'refs/heads/main'
@@ -472,3 +470,22 @@ jobs:
               kubectl -n ${{ vars.NAMESPACE }} logs -l app=solar-system --all-containers=true
               exit 1
             }
+
+    slack_notification:
+      if: always()
+      name: Slack Notification
+      needs: [dev-Integration-testing, prod-Integration-testing]
+      continue-on-error: true
+      runs-on: ubuntu-latest
+      steps:
+      - uses: actions/checkout@v4
+      - name: Slack Notification
+        uses: rtCamp/action-slack-notify@v2
+
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_CHANNEL: slack_github
+          SLACK_COLOR: ${{ job.status }} 
+          SLACK_ICON: https://gitlab.com/sidd-harth/solar-system/-/raw/main/images/saturn.png
+          SLACK_MESSAGE: ':hammer_and_wrench: Triggered by ${{ github.actor }}'
+          SLACK_TITLE: Information
