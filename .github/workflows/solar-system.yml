@@ -44,14 +44,10 @@ jobs:
           with:
             node-version: ${{ matrix.nodejs_version}}
         
-        - name: Install Dependencies
-          run: npm install
-
-        - name: cache NPM dependencies
-          uses: actions/cache@v4
+        - name: Composite Action - Cache & Install NPM Packages
+          uses: ./.github/custom-actions/npm-action
           with:
-            path: node_modules
-            key: ${{ runner.os }}-node_modules-${{ hashFiles('**/package-lock.json') }}
+            path-of-folder: node_modules
                
         - name: Unit Testing
           id: nodejs-unit-testing-step
@@ -89,14 +85,10 @@ jobs:
         #   with:
         #     node-version: 18
 
-        - name: cache NPM dependencies
-          uses: actions/cache@v4
+        - name: Composite Action - Cache & Install NPM Packages
+          uses: ./.github/custom-actions/npm-action
           with:
-            path: node_modules
-            key: ${{ runner.os }}-node_modules-${{ hashFiles('**/package-lock.json') }}
-              
-        - name: Install Dependencies
-          run: npm install
+            path-of-folder: node_modules
         
         - name: Check Code Coverage
           continue-on-error: true
@@ -108,7 +100,43 @@ jobs:
             name: code-coverage-result
             path: coverage
             retention-days: 5 
-    
+          
+    reports-s3:
+      needs: [unit-testing, code-coverage]
+      name: AWS -S3 upload reports
+      runs-on: ubuntu-latest
+      continue-on-error: true
+      steps:
+        - name: Downlaod Mocha Test Artifact
+          uses: actions/download-artifact@v4
+          with:
+            name: Mocha-Test-Result - ubuntu-latest-18
+
+        - name: Downlaod Code Coverage Artifact
+          uses: actions/download-artifact@v4
+          with:
+            name: code-coverage-result
+
+        - name: Merge Test Files 
+          run: |
+            ls -ltr
+            mkdir reports-${{ github.sha }}
+            mv cobertura-coverage.xml reports-${{ github.sha }}/
+            mv test-results.xml reports-${{ github.sha }}/
+            ls -ltr reports-${{ github.sha }}/
+        
+        - name: Upload to AWS S3
+          uses: jakejarvis/s3-sync-action@master
+          with:
+            args: --follow-symlinks --delete
+          env:
+            AWS_S3_BUCKET: solar-system-bucket
+            AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+            AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            AWS_REGION: 'us-east-1'   # optional: defaults to us-east-1
+            SOURCE_DIR: 'reports-${{ github.sha }}'
+            DEST_DIR: 'reports-${{ github.sha }}'     # optional: defaults to entire repository
+          
     docker:
         name: Containerization
         needs: [unit-testing, code-coverage]
@@ -203,7 +231,13 @@ jobs:
       uses: srikanth240695/solar-system/.github/workflows/reuse-deployment.yml@feature/Exploring-Workflows
       with:
         environment_name: development
-
+        mongodb-uri: ${{ vars.MONGO_URI}}
+        k8s-manifest-dir: kubernetes/development/
+        kubectl-version: v1.32.0
+      secrets: 
+        k8s-kubeconfig: ${{ secrets.KUBECONFIG }}
+        mangodb-password: ${{ secrets.MONGO_PASSWORD }}
+        
     dev-Integration-testing:
         name: Dev Integration Testing
         if: contains(github.ref, 'feature/')
@@ -319,6 +353,12 @@ jobs:
       uses: srikanth240695/solar-system/.github/workflows/reuse-deployment.yml@feature/Exploring-Workflows
       with:
         environment_name: production
+        mongodb-uri: ${{ vars.MONGO_URI}}
+        k8s-manifest-dir: kubernetes/production/
+        kubectl-version: v1.32.0
+      secrets: 
+        k8s-kubeconfig: ${{ secrets.KUBECONFIG }}
+        mangodb-password: ${{ secrets.MONGO_PASSWORD }}
 
     prod-Integration-testing:
         name: Prod Integration Testing
@@ -422,3 +462,22 @@ jobs:
               kubectl -n ${{ vars.NAMESPACE }} logs -l app=solar-system --all-containers=true
               exit 1
             }
+
+    slack_notification:
+      if: always()
+      name: Slack Notification
+      needs: [dev-Integration-testing, prod-Integration-testing]
+      continue-on-error: true
+      runs-on: ubuntu-latest
+      steps:
+      - uses: actions/checkout@v4
+      - name: Slack Notification
+        uses: rtCamp/action-slack-notify@v2
+
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_CHANNEL: slack_github
+          SLACK_COLOR: ${{ job.status }} 
+          SLACK_ICON: https://gitlab.com/sidd-harth/solar-system/-/raw/main/images/saturn.png
+          SLACK_MESSAGE: ':hammer_and_wrench: Triggered by ${{ github.actor }}'
+          SLACK_TITLE: Information

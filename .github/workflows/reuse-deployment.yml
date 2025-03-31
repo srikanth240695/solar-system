@@ -1,20 +1,46 @@
 name: Deployment - Reusuable work flow
 
 on:
-    workflow_call: 
-      inputs:
-       environment_name:
+  workflow_call: 
+    secrets:
+      k8s-kubeconfig:
+        required: true
+      mangodb-password:
+        required: true
+    inputs:
+      environment_name:
         description: 'The environment to deploy to (development or production)'
         required: true
         type: string
+      mongodb-uri:
+        required: true
+        type: string
+      kubectl-version:
+        description: provide the required kubectl version
+        required: true
+        default: 'v1.26.0'
+        type: string
+      k8s-manifest-dir:
+        description: provide the deployment environment
+        default: kubernetes/
+        required: true
+        type: string
+    outputs:
+      APP_INGRESS_URL:
+        description: "The ingress URL of the deployed application"
+        value: ${{ jobs.reuse-deploy.outputs.APP_INGRESS_URL }}
+      NAMESPACE:
+        description: "The namespace used for deployment"
+        value: ${{ jobs.reuse-deploy.outputs.NAMESPACE }}
 
 jobs:
     reuse-deploy:
         environment: 
             name: ${{ inputs.environment_name }}
-            url: https://${{ steps.set-ingress-host-address.outputs.APP_INGRESS_HOST }}
+            # url: https://${{ jobs.reuse-deploy.outputs.APP_INGRESS_URL }}
         outputs:
             APP_INGRESS_URL: ${{ steps.set-ingress-host-address.outputs.APP_INGRESS_HOST }}
+            NAMESPACE: ${{ inputs.environment_name }}
         runs-on: ubuntu-latest
         steps:
             - name: checkout Repo
@@ -123,45 +149,54 @@ jobs:
               with:
                 tokenPrefix: '_{_'
                 tokenSuffix: '_}_'
-                files: '["kubernetes/${{ inputs.environment_name }}/*.yaml"]'
+                files: '["${{ inputs.k8s-manifest-dir }}/*.yaml"]'
+                # files: '["kubernetes/${{ inputs.environment_name }}/*.yaml"]'
               env:
-                NAMESPACE: ${{ vars.NAMESPACE }}
+                NAMESPACE: ${{ inputs.environment_name }}
                 REPLICAS: ${{ vars.REPLICAS }}
                 IMAGE: ${{ vars.DOCKERHUB_USERNAME}}/solar-system:${{ github.sha}}
                 INGRESS_IP: ${{ env.INGRESS_IP}}
 
             - name: Check files
               run: | 
-                cat kubernetes/${{ inputs.environment_name }}/*.yaml
+                cat ${{ inputs.k8s-manifest-dir }}/*.yaml
+                # cat kubernetes/${{ inputs.environment_name }}/*.yaml
 
-            - name: Create Development Namespace
+
+            - name: Create Namespace
               run: |
-                kubectl create namespace ${{ vars.NAMESPACE }} --dry-run=client -o yaml | kubectl apply -f -
+                NAMESPACE=${{ inputs.environment_name }}  # Set namespace dynamically
+                echo "Using namespace: $NAMESPACE"
+                kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
                 kubectl get namespaces
 
             - name: create Mongo DB secret
               run: |
-                kubectl -n ${{ vars.NAMESPACE }} create secret generic mongo-db-creds \
-                --from-literal=MONGO_URI=${{ env.MONGO_URI }} \
+                kubectl -n ${{ inputs.environment_name }} create secret generic mongo-db-creds \
+                --from-literal=MONGO_URI=${{ inputs.mongodb-uri }} \
                 --from-literal=MONGO_USERNAME=${{ vars.MONGO_USERNAME }} \
-                --from-literal=MONGO_PASSWORD=${{ secrets.MONGO_PASSWORD }} \
+                --from-literal=MONGO_PASSWORD=${{ secrets.mangodb-password }} \
                 --save-config \
                 --dry-run=client \
                 -o yaml | kubectl apply -f -
 
             - name: Deploy to Dev env
               run: |
-                kubectl apply -f kubernetes/${{ inputs.environment_name }}
+                # kubectl apply -f kubernetes/${{ inputs.environment_name }}
+                kubectl apply -f ${{ inputs.k8s-manifest-dir }} -n ${{ inputs.environment_name }}
+                
 
             - name: Verify Deployment
               run: |
-                kubectl -n ${{ vars.NAMESPACE }} wait --for=condition=ready pod -l app=solar-system --timeout=300s
-                kubectl -n ${{ vars.NAMESPACE }} get pods
+                kubectl -n ${{ inputs.environment_name }} wait --for=condition=ready pod -l app=solar-system --timeout=300s
+                kubectl -n ${{ inputs.environment_name }} get pods
             
             - name: Set App Ingress Host URL
               id: set-ingress-host-address
               run: |
-                echo "APP_INGRESS_HOST=$(kubectl -n ${{ vars.NAMESPACE }} get ingress -o jsonpath="{.items[0].spec.tls[0].hosts[0]}")" >> "$GITHUB_OUTPUT"
+                 APP_INGRESS_HOST=$(kubectl -n ${{ inputs.environment_name }} get ingress -o jsonpath="{.items[0].spec.tls[0].hosts[0]}")
+                 echo "APP_INGRESS_HOST=$APP_INGRESS_HOST" >> "$GITHUB_OUTPUT"
+                # echo "APP_INGRESS_HOST=$(kubectl -n ${{ vars.NAMESPACE }} get ingress -o jsonpath="{.items[0].spec.tls[0].hosts[0]}")" >> "$GITHUB_OUTPUT"
 
             - name: Upload Minikube Config
               run: |
@@ -171,6 +206,13 @@ jobs:
                 name: minikube-config-${{ inputs.environment_name }}
                 path: minikube-config.tar.gz
                 retention-days: 1
+
+            - name: Set Environment URL
+              if: success()
+              run: |
+                APP_URL="https://${{ steps.set-ingress-host-address.outputs.APP_INGRESS_HOST }}"
+                echo "Setting environment URL to: $APP_URL"
+                echo "::set-output name=environment_url::$APP_URL"
 
 
         # - name: Install kubectl CLI
@@ -187,7 +229,7 @@ jobs:
         #     echo "${{ secrets.MINIKUBE_CLIENT_CRT }}" | base64 --decode > $HOME/.minikube/profiles/minikube/client.crt
         #     echo "${{ secrets.MINIKUBE_CLIENT_KEY }}" | base64 --decode > $HOME/.minikube/profiles/minikube/client.key
         #     # Decode kubeconfig and fix paths
-        #     echo "${{ secrets.KUBECONFIG }}" | base64 --decode > $HOME/.kube/config
+        #     echo "${{ secrets.k8s-kubeconfig }}" | base64 --decode > $HOME/.kube/config
         #     # Replace Windows paths with Unix paths
         #     sed -i "s|C:\\\\Users\\\\6113534\\\\|$HOME/|g" $HOME/.kube/config
         #     sed -i "s|\\\\|/|g" $HOME/.kube/config
